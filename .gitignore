@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Forensic Data & Storage (Never commit raw captures, databases, or keys)
+*.pcap
+*.pcapng
+*.cap
+*.key
+*.pem
+*.crt
+keylog*.txt
+storage/
+uploads/
+temp/
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Node / Web
+node_modules/
+dist/
+.next/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+.DS_Store
