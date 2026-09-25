@@ -1,0 +1,25 @@
+# Postfix main.cf for SecureMailScope Synthetic Lab
+myhostname = postfix.mailnet
+mydomain = mailnet
+myorigin = $mydomain
+inet_interfaces = all
+inet_protocols = ipv4
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+mynetworks = 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+
+# Relay Restrictions & Alias setup for synthetic lab
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
+alias_maps = 
+alias_database = 
+
+# Security: Disable outbound delivery to prevent external connections
+default_transport = error:Outbound mail delivery is disabled in synthetic lab
+
+# Default TLS configuration
+smtpd_tls_security_level = may
+smtpd_tls_cert_file = /certs/server_valid.crt
+smtpd_tls_key_file = /certs/server_valid.key
+smtpd_tls_loglevel = 1
+smtpd_tls_received_header = yes
+
+maillog_file = /var/log/postfix.log

@@ -1,0 +1,49 @@
+networks:
+  mailnet:
+    driver: bridge
+
+services:
+  generator:
+    build:
+      context: ./generator
+      dockerfile: Dockerfile
+    container_name: mailnet_generator
+    networks:
+      - mailnet
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - certs_data:/certs
+      - ../storage/pcaps/synthetic:/captures
+      - ../datasets/manifests:/manifests
+    depends_on:
+      - postfix
+      - dovecot
+
+  postfix:
+    build:
+      context: ./postfix
+      dockerfile: Dockerfile
+    container_name: mailnet_postfix
+    networks:
+      mailnet:
+        aliases:
+          - postfix.mailnet
+    volumes:
+      - certs_data:/certs
+
+  dovecot:
+    build:
+      context: ./dovecot
+      dockerfile: Dockerfile
+    container_name: mailnet_dovecot
+    networks:
+      mailnet:
+        aliases:
+          - dovecot.mailnet
+    volumes:
+      - certs_data:/certs
+
+volumes:
+  certs_data:

@@ -1,0 +1,400 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "SCN-SMTP-01",
+      "name": "SMTP Plaintext Session",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-SMTP-01.pcap",
+      "sha256": "84692307f212aa5fd58650e85ba03c86b76e6b5119fde131c2c0ff8c08a08642",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 2527,
+        "tls_security_level": "none",
+        "cert_profile": "N/A"
+      },
+      "expected_behavior": {
+        "starttls_advertised": false,
+        "starttls_requested": false,
+        "handshake_outcome": "N/A",
+        "tls_version": null,
+        "client_verification": "N/A"
+      },
+      "observed_behavior": {
+        "packets_captured": 21,
+        "tshark_detected_protocol": "UNKNOWN",
+        "handshake_completed": false,
+        "tls_version_observed": null,
+        "cipher_observed": null
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "MAIL FROM",
+          "RCPT TO",
+          "DATA",
+          "QUIT"
+        ],
+        "tls_negotiated": false,
+        "certificate_status": "NOT_APPLICABLE",
+        "security_posture": "UNENCRYPTED"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-SMTP-02",
+      "name": "SMTP STARTTLS Successful Upgrade",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-SMTP-02.pcap",
+      "sha256": "837d09affa0ad776088f76b80be3a6617514f5f00052850d8272bf4dfdeacadd",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 25,
+        "tls_security_level": "may",
+        "cert_profile": "valid_ca_signed"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": true,
+        "handshake_outcome": "SUCCESS",
+        "tls_version": "TLSv1.3",
+        "client_verification": "SUCCESS"
+      },
+      "observed_behavior": {
+        "packets_captured": 27,
+        "tshark_detected_protocol": "SMTP",
+        "handshake_completed": false,
+        "tls_version_observed": "TLSv1.3",
+        "cipher_observed": "TLS_AES_256_GCM_SHA384"
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "STARTTLS"
+        ],
+        "tls_negotiated": true,
+        "certificate_status": "VALID",
+        "security_posture": "SECURE",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "tls_version": "TLSv1.3"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-SMTP-03",
+      "name": "SMTP STARTTLS Advertised But Unused",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-SMTP-03.pcap",
+      "sha256": "3a46a0efb922f94cbfe6555c859dca03ab2b568ffd0a4fefbf7675095294d43d",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 25,
+        "tls_security_level": "may",
+        "cert_profile": "valid_ca_signed"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": false,
+        "handshake_outcome": "N/A",
+        "tls_version": null,
+        "client_verification": "N/A"
+      },
+      "observed_behavior": {
+        "packets_captured": 19,
+        "tshark_detected_protocol": "SMTP",
+        "handshake_completed": false,
+        "tls_version_observed": null,
+        "cipher_observed": null
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "MAIL FROM",
+          "RCPT TO",
+          "DATA",
+          "QUIT"
+        ],
+        "tls_negotiated": false,
+        "certificate_status": "NOT_APPLICABLE",
+        "security_posture": "UNENCRYPTED_OPPORTUNITY_MISSED"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-IMAP-01",
+      "name": "IMAP STARTTLS Successful Upgrade",
+      "protocol": "IMAP",
+      "pcap_filename": "SCN-IMAP-01.pcap",
+      "sha256": "2af4b11e66357304b72e2f4c227f2ae8abfa423d2efd4bcad518a501873f1196",
+      "configured_behavior": {
+        "server": "Dovecot",
+        "port": 143,
+        "tls_security_level": "starttls",
+        "cert_profile": "valid_ca_signed"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": true,
+        "handshake_outcome": "SUCCESS",
+        "tls_version": "TLSv1.3",
+        "client_verification": "SUCCESS"
+      },
+      "observed_behavior": {
+        "packets_captured": 17,
+        "tshark_detected_protocol": "IMAP",
+        "handshake_completed": false,
+        "tls_version_observed": "0x0303",
+        "cipher_observed": "0x1302",
+        "client_error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate signature failure (_ssl.c:1016)"
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "CAPABILITY",
+          "STARTTLS"
+        ],
+        "tls_negotiated": true,
+        "certificate_status": "VALID",
+        "security_posture": "SECURE",
+        "cipher": "0x1302",
+        "tls_version": "0x0303"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-POP3-01",
+      "name": "POP3 STLS Successful Upgrade",
+      "protocol": "POP3",
+      "pcap_filename": "SCN-POP3-01.pcap",
+      "sha256": "507b2bf2c2134331398a60ffc3ff72f78407d857787acfb445b89b0434fdb3b4",
+      "configured_behavior": {
+        "server": "Dovecot",
+        "port": 110,
+        "tls_security_level": "stls",
+        "cert_profile": "valid_ca_signed"
+      },
+      "expected_behavior": {
+        "stls_advertised": true,
+        "stls_requested": true,
+        "handshake_outcome": "SUCCESS",
+        "tls_version": "TLSv1.3",
+        "client_verification": "SUCCESS"
+      },
+      "observed_behavior": {
+        "packets_captured": 17,
+        "tshark_detected_protocol": "POP3",
+        "handshake_completed": false,
+        "tls_version_observed": "0x0303",
+        "cipher_observed": "0x1302",
+        "client_error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: certificate signature failure (_ssl.c:1016)"
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "CAPA",
+          "STLS"
+        ],
+        "tls_negotiated": true,
+        "certificate_status": "VALID",
+        "security_posture": "SECURE",
+        "cipher": "0x1302",
+        "tls_version": "0x0303"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-TLS12-BASELINE-01",
+      "name": "SMTP TLS 1.2 Baseline Negotiation",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-TLS12-BASELINE-01.pcap",
+      "sha256": "c434aa1df7c5e7143b794116f1aeefde0af2c4aa71395ab28afdf90f83aa2a9c",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 2528,
+        "tls_security_level": "may",
+        "cert_profile": "valid_ca_signed",
+        "forced_protocol": "TLSv1.2"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": true,
+        "handshake_outcome": "SUCCESS",
+        "tls_version": "TLSv1.2",
+        "client_verification": "SUCCESS"
+      },
+      "observed_behavior": {
+        "packets_captured": 18,
+        "tshark_detected_protocol": "TLS",
+        "handshake_completed": false,
+        "tls_version_observed": "TLSv1.2",
+        "cipher_observed": "ECDHE-RSA-AES256-GCM-SHA384"
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "STARTTLS"
+        ],
+        "tls_negotiated": true,
+        "certificate_status": "VALID",
+        "security_posture": "TLS12_FORWARD_SECRECY",
+        "cipher": "ECDHE-RSA-AES256-GCM-SHA384",
+        "tls_version": "TLSv1.2"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-TLS-WEAK-01",
+      "name": "SMTP Forced Non-Forward-Secrecy Static RSA",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-TLS-WEAK-01.pcap",
+      "sha256": "2b4ec0b6525f929984fe7480f5a86b973b38731c83e9e991ea8d5967eaff4c71",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 2528,
+        "tls_security_level": "may",
+        "cert_profile": "valid_ca_signed",
+        "forced_cipher": "Static RSA / Non-PFS"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": true,
+        "handshake_outcome": "SUCCESS",
+        "tls_version": "TLSv1.2",
+        "client_verification": "SUCCESS"
+      },
+      "observed_behavior": {
+        "packets_captured": 18,
+        "tshark_detected_protocol": "TLS",
+        "handshake_completed": false,
+        "tls_version_observed": "TLSv1.2",
+        "cipher_observed": "AES128-SHA"
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "STARTTLS"
+        ],
+        "tls_negotiated": true,
+        "certificate_status": "VALID",
+        "security_posture": "NO_FORWARD_SECRECY",
+        "cipher": "AES128-SHA",
+        "tls_version": "TLSv1.2"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-TLS-SELF-SIGNED-01",
+      "name": "Self-Signed Certificate Validation Failure",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-TLS-SELF-SIGNED-01.pcap",
+      "sha256": "58ef5d02f4894a90aa57001b6c238c836a00b05f7b34c22500732c5f250eea9f",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 2525,
+        "tls_security_level": "may",
+        "cert_profile": "self_signed"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": true,
+        "handshake_outcome": "CLIENT_VERIFICATION_FAILURE",
+        "tls_version": null,
+        "client_verification": "FAILED_SELF_SIGNED"
+      },
+      "observed_behavior": {
+        "packets_captured": 14,
+        "tshark_detected_protocol": "TLS",
+        "handshake_completed": false,
+        "tls_version_observed": "0x0303",
+        "cipher_observed": "0x1302",
+        "client_error": "[SSL: CERTIFICATE_VERIFY_FAILED] self-signed certificate"
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "STARTTLS"
+        ],
+        "tls_negotiated": false,
+        "certificate_status": "SELF_SIGNED_UNTRUSTED",
+        "security_posture": "CERTIFICATE_UNTRUSTED",
+        "cipher": "0x1302",
+        "tls_version": "0x0303"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-TLS-EXPIRED-01",
+      "name": "Expired Certificate Validation Failure",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-TLS-EXPIRED-01.pcap",
+      "sha256": "a97de34fd53057026de8b1d2ae243795d4b5a8202e732bdfeb7492b68bded9b8",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 2526,
+        "tls_security_level": "may",
+        "cert_profile": "expired_ca_signed"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": true,
+        "handshake_outcome": "CLIENT_VERIFICATION_FAILURE",
+        "tls_version": null,
+        "client_verification": "FAILED_EXPIRED"
+      },
+      "observed_behavior": {
+        "packets_captured": 14,
+        "tshark_detected_protocol": "TLS",
+        "handshake_completed": false,
+        "tls_version_observed": "0x0303",
+        "cipher_observed": "0x1302",
+        "client_error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate has expired"
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "STARTTLS"
+        ],
+        "tls_negotiated": false,
+        "certificate_status": "EXPIRED",
+        "security_posture": "CERTIFICATE_EXPIRED",
+        "cipher": "0x1302",
+        "tls_version": "0x0303"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "scenario_id": "SCN-TLS-INTERRUPTED-01",
+      "name": "Interrupted TLS Handshake After STARTTLS",
+      "protocol": "SMTP",
+      "pcap_filename": "SCN-TLS-INTERRUPTED-01.pcap",
+      "sha256": "c7441a5ddb5b4fbcef186bd4846a353f73e2d09e2c92540a29fce54303ee6318",
+      "configured_behavior": {
+        "server": "Postfix",
+        "port": 25,
+        "tls_security_level": "may",
+        "cert_profile": "valid_ca_signed"
+      },
+      "expected_behavior": {
+        "starttls_advertised": true,
+        "starttls_requested": true,
+        "handshake_outcome": "INTERRUPTED",
+        "tls_version": null,
+        "client_verification": "ABORTED"
+      },
+      "observed_behavior": {
+        "packets_captured": 13,
+        "tshark_detected_protocol": "SMTP",
+        "handshake_completed": false,
+        "tls_version_observed": null,
+        "cipher_observed": null
+      },
+      "ground_truth_labels": {
+        "plaintext_commands_before_tls": [
+          "EHLO",
+          "STARTTLS"
+        ],
+        "tls_negotiated": false,
+        "certificate_status": "INCOMPLETE_HANDSHAKE",
+        "security_posture": "HANDSHAKE_ABORTED"
+      },
+      "verification_status": "VERIFIED"
+    }
+  ]
+}
