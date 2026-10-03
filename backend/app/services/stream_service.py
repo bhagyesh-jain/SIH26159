@@ -13,6 +13,7 @@ from backend.app.services.protocols.smtp import SMTPStateMachine
 from backend.app.services.protocols.imap import IMAPStateMachine
 from backend.app.services.protocols.pop3 import POP3StateMachine
 from backend.app.services.protocols.tls import analyze_tls_stream
+from backend.app.services.finding_service import FindingService
 
 
 def parse_packet_layers(packet: Dict[str, Any]) -> Dict[str, Any]:
@@ -252,6 +253,10 @@ def process_capture_streams(db: DbSession, capture_id: str, job_id: str):
                     details_json=json.dumps(clean_details) if clean_details else None
                 )
                 db.add(db_sec_event)
+
+            db.flush()
+            # Generate deterministic findings for session
+            FindingService.generate_findings_for_session(db, session_db_id)
 
         job.state = "COMPLETED"
         job.ended_at = datetime.datetime.utcnow()

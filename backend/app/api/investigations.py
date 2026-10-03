@@ -3,10 +3,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DbSession
 from backend.app.models.database import (
-    get_db, Investigation, Capture, Session as DbSessionModel, SecurityEvent
+    get_db, Investigation, Capture, Session as DbSessionModel, SecurityEvent, Finding
 )
 from backend.app.schemas.investigation import InvestigationCreate, InvestigationResponse
 from backend.app.schemas.security_event import SecurityEventResponse
+from backend.app.schemas.finding import FindingResponse
 
 router = APIRouter()
 
@@ -80,3 +81,47 @@ def get_investigation_security_events(
 
     events = query.offset(offset).limit(limit).all()
     return [SecurityEventResponse.from_db(evt) for evt in events]
+
+
+@router.get("/investigations/{investigation_id}/findings", response_model=List[FindingResponse])
+def get_investigation_findings(
+    investigation_id: str,
+    severity: Optional[str] = Query(None, description="Filter by severity (CRITICAL, HIGH, MEDIUM, LOW, INFO)"),
+    confidence: Optional[str] = Query(None, description="Filter by confidence (HIGH, MEDIUM, LOW, UNKNOWN)"),
+    protocol: Optional[str] = Query(None, description="Filter by protocol (SMTP, IMAP, POP3, UNKNOWN)"),
+    rule_id: Optional[str] = Query(None, description="Filter by rule ID"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: DbSession = Depends(get_db)
+):
+    """
+    Retrieves all persisted deterministic findings across all captures and sessions belonging to an investigation.
+    """
+    inv = db.query(Investigation).filter(Investigation.id == investigation_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation case not found.")
+
+    captures = db.query(Capture).filter(Capture.investigation_id == investigation_id).all()
+    capture_ids = [c.id for c in captures]
+
+    if not capture_ids:
+        return []
+
+    sessions = db.query(DbSessionModel).filter(DbSessionModel.capture_id.in_(capture_ids)).all()
+    session_ids = [s.id for s in sessions]
+
+    if not session_ids:
+        return []
+
+    query = db.query(Finding).filter(Finding.session_id.in_(session_ids))
+    if severity:
+        query = query.filter(Finding.severity == severity.upper())
+    if confidence:
+        query = query.filter(Finding.confidence == confidence.upper())
+    if protocol:
+        query = query.filter(Finding.protocol == protocol.upper())
+    if rule_id:
+        query = query.filter(Finding.rule_id == rule_id)
+
+    findings = query.order_by(Finding.risk_score.desc()).offset(offset).limit(limit).all()
+    return [FindingResponse.from_db(f) for f in findings]

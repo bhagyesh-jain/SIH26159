@@ -61,11 +61,11 @@ flowchart TD
 - `tls_handshakes(id, session_id, version, cipher, outcome, completeness, evidence_json)`
 - `certificates(id, handshake_id, fingerprint, subject, issuer, not_before, not_after, public_key, signature_algorithm, validation_json)`
 - `security_events(id, session_id, event_type, protocol, upgrade_status, observed_value, frame_numbers, timestamp, evidence_source, completeness_status, details_json)`
-- `findings(id, session_id, rule_id, severity, confidence, title, explanation, evidence_json, remediation, rule_version)`
+- `findings(id, investigation_id, session_id, rule_id, title, description, severity, confidence, risk_score, status, protocol, observed_value, evidence_event_ids, evidence_frame_numbers, first_seen, last_seen, details_json)`
 - `ml_assessments(id, session_id, model_version, anomaly_score, feature_json, explanation_json)`
 - `reports(id, investigation_id, format, created_at, path, assessment_version)`
 
-Use SQLAlchemy and Alembic from the beginning. Never persist uploaded secrets or plaintext passwords in logs or security event metadata. `details_json` includes capture hash, stream and frame references.
+Use SQLAlchemy and Alembic from the beginning. Never persist uploaded secrets or plaintext passwords in logs, security event metadata, or finding details. `evidence_event_ids` and `evidence_frame_numbers` are stored as structured JSON string arrays in the database.
 
 ## 5. API v1
 - `GET /api/v1/health` — runtime health and TShark availability (no sensitive paths publicly exposed).
@@ -77,7 +77,8 @@ Use SQLAlchemy and Alembic from the beginning. Never persist uploaded secrets or
 - `GET /api/v1/sessions/{id}` — event timeline and evidence.
 - `GET /api/v1/sessions/{session_id}/security-events` — filterable security events for a specific session (`protocol`, `event_type`, `upgrade_status`, `limit`, `offset`).
 - `GET /api/v1/investigations/{investigation_id}/security-events` — filterable security events across all sessions in an investigation (`protocol`, `event_type`, `upgrade_status`, `limit`, `offset`).
-- `GET /api/v1/investigations/{id}/findings` — filterable findings.
+- `GET /api/v1/sessions/{session_id}/findings` — filterable deterministic findings for a specific session (`severity`, `confidence`, `protocol`, `rule_id`, `limit`, `offset`).
+- `GET /api/v1/investigations/{investigation_id}/findings` — filterable deterministic findings across all sessions in an investigation (`severity`, `confidence`, `protocol`, `rule_id`, `limit`, `offset`).
 - `GET /api/v1/investigations/{id}/summary` — aggregate counts, score and coverage.
 - `POST /api/v1/investigations/{id}/reports` — export requested format.
 

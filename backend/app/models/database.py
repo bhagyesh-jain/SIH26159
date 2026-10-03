@@ -75,6 +75,7 @@ class Session(Base):
     capture = relationship("Capture", back_populates="sessions")
     events = relationship("Event", back_populates="session", cascade="all, delete-orphan")
     security_events = relationship("SecurityEvent", back_populates="session", cascade="all, delete-orphan")
+    findings = relationship("Finding", back_populates="session", cascade="all, delete-orphan")
 
 
 class Event(Base):
@@ -106,6 +107,31 @@ class SecurityEvent(Base):
     details_json = Column(Text, nullable=True)   # JSON string with evidence fields
 
     session = relationship("Session", back_populates="security_events")
+
+
+class Finding(Base):
+    __tablename__ = "findings"
+
+    id = Column(String, primary_key=True, index=True)
+    investigation_id = Column(String, ForeignKey("investigations.id"), nullable=False, index=True)
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    rule_id = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    severity = Column(String, nullable=False)  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    confidence = Column(String, nullable=False)  # HIGH, MEDIUM, LOW, UNKNOWN
+    risk_score = Column(Integer, nullable=False)  # Deterministic score (0-100)
+    status = Column(String, nullable=False, default="ACTIVE")  # ACTIVE, SUPPRESSED
+    protocol = Column(String, nullable=False)  # SMTP, IMAP, POP3, UNKNOWN
+    observed_value = Column(Text, nullable=False)
+    evidence_event_ids = Column(Text, nullable=False)  # JSON array string, e.g. '["sevt_1", "sevt_2"]'
+    evidence_frame_numbers = Column(Text, nullable=False)  # JSON array string, e.g. '[4, 6, 8, 10]'
+    first_seen = Column(String, nullable=True)
+    last_seen = Column(String, nullable=True)
+    details_json = Column(Text, nullable=True)  # JSON string with structured details
+
+    session = relationship("Session", back_populates="findings")
+    investigation = relationship("Investigation")
 
 
 def init_db():
