@@ -98,6 +98,7 @@ def get_session_findings(
     confidence: Optional[str] = Query(None, description="Filter by confidence (HIGH, MEDIUM, LOW, UNKNOWN)"),
     protocol: Optional[str] = Query(None, description="Filter by protocol (SMTP, IMAP, POP3, UNKNOWN)"),
     rule_id: Optional[str] = Query(None, description="Filter by rule ID"),
+    status: Optional[str] = Query(None, description="Filter by status (ACTIVE, RESOLVED, SUPPRESSED)"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: DbSession = Depends(get_db)
@@ -118,6 +119,8 @@ def get_session_findings(
         query = query.filter(Finding.protocol == protocol.upper())
     if rule_id:
         query = query.filter(Finding.rule_id == rule_id)
+    if status:
+        query = query.filter(Finding.status == status.upper())
 
-    findings = query.order_by(Finding.risk_score.desc()).offset(offset).limit(limit).all()
+    findings = query.order_by(Finding.risk_score.desc(), Finding.id.asc()).offset(offset).limit(limit).all()
     return [FindingResponse.from_db(f) for f in findings]

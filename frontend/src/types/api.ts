@@ -118,6 +118,63 @@ export interface FindingQueryParams {
   confidence?: FindingConfidence;
   protocol?: ForensicProtocol | string;
   rule_id?: string;
+  status?: FindingStatus | string;
   limit?: number;
   offset?: number;
+}
+
+export interface SeverityBreakdown {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+}
+
+export interface ProtocolBreakdown {
+  smtp_sessions: number;
+  imap_sessions: number;
+  pop3_sessions: number;
+  unknown_sessions: number;
+}
+
+export interface SecurityPostureSummary {
+  plaintext_not_offered_sessions: number;
+  starttls_offered_not_used_sessions: number;
+  weak_static_rsa_sessions: number;
+  certificate_alert_sessions: number;
+  handshake_failed_sessions: number;
+  secure_baseline_sessions: number;
+}
+
+export interface EvidenceQualitySummary {
+  complete_sessions: number;
+  incomplete_sessions: number;
+  high_confidence_findings: number;
+  medium_confidence_findings: number;
+  low_or_unknown_confidence_findings: number;
+}
+
+export interface InvestigationSummaryTotals {
+  captures_count: number;
+  sessions_count: number;
+  total_findings_count: number;
+  actionable_findings_count: number;
+  informational_findings_count: number;
+  suppressed_findings_count: number;
+  resolved_findings_count: number;
+  affected_sessions_count: number;
+  highest_risk_score: number;
+}
+
+export interface InvestigationSummaryResponse {
+  investigation_id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  totals: InvestigationSummaryTotals;
+  severity_breakdown: SeverityBreakdown;
+  protocol_breakdown: ProtocolBreakdown;
+  security_posture: SecurityPostureSummary;
+  evidence_quality: EvidenceQualitySummary;
 }

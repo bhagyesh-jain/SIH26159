@@ -1,11 +1,16 @@
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, distinct
 from sqlalchemy.orm import Session as DbSession
 from backend.app.models.database import (
     get_db, Investigation, Capture, Session as DbSessionModel, SecurityEvent, Finding
 )
-from backend.app.schemas.investigation import InvestigationCreate, InvestigationResponse
+from backend.app.schemas.investigation import (
+    InvestigationCreate, InvestigationResponse, InvestigationSummaryResponse,
+    InvestigationSummaryTotals, SeverityBreakdown, ProtocolBreakdown,
+    SecurityPostureSummary, EvidenceQualitySummary
+)
 from backend.app.schemas.security_event import SecurityEventResponse
 from backend.app.schemas.finding import FindingResponse
 
@@ -40,6 +45,144 @@ def get_investigation(investigation_id: str, db: DbSession = Depends(get_db)):
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation case not found.")
     return inv
+
+
+@router.get("/investigations/{investigation_id}/summary", response_model=InvestigationSummaryResponse)
+def get_investigation_summary(investigation_id: str, db: DbSession = Depends(get_db)):
+    """
+    Returns authoritative aggregated investigation metrics, severity distribution,
+    protocol breakdowns, security posture indicators, and evidence quality summary.
+    Performs server-side database SQL aggregation.
+    """
+    inv = db.query(Investigation).filter(Investigation.id == investigation_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation case not found.")
+
+    # 1. Capture & Session Totals
+    captures_count = db.query(func.count(Capture.id)).filter(Capture.investigation_id == investigation_id).scalar() or 0
+    
+    capture_ids_subquery = db.query(Capture.id).filter(Capture.investigation_id == investigation_id)
+    sessions_count = db.query(func.count(DbSessionModel.id)).filter(DbSessionModel.capture_id.in_(capture_ids_subquery)).scalar() or 0
+
+    # 2. Protocol Breakdown
+    protocol_rows = (
+        db.query(DbSessionModel.protocol, func.count(DbSessionModel.id))
+        .filter(DbSessionModel.capture_id.in_(capture_ids_subquery))
+        .group_by(DbSessionModel.protocol)
+        .all()
+    )
+    proto_map = {p: c for p, c in protocol_rows}
+
+    # 3. Session Completeness Breakdown
+    completeness_rows = (
+        db.query(DbSessionModel.completeness, func.count(DbSessionModel.id))
+        .filter(DbSessionModel.capture_id.in_(capture_ids_subquery))
+        .group_by(DbSessionModel.completeness)
+        .all()
+    )
+    comp_map = {c: count for c, count in completeness_rows}
+
+    # 4. Finding Counts & Status Totals
+    total_findings_count = db.query(func.count(Finding.id)).filter(Finding.investigation_id == investigation_id).scalar() or 0
+    actionable_findings_count = db.query(func.count(Finding.id)).filter(
+        Finding.investigation_id == investigation_id,
+        Finding.severity != "INFO",
+        Finding.status == "ACTIVE"
+    ).scalar() or 0
+    informational_findings_count = db.query(func.count(Finding.id)).filter(
+        Finding.investigation_id == investigation_id,
+        Finding.severity == "INFO"
+    ).scalar() or 0
+    suppressed_findings_count = db.query(func.count(Finding.id)).filter(
+        Finding.investigation_id == investigation_id,
+        Finding.status == "SUPPRESSED"
+    ).scalar() or 0
+    resolved_findings_count = db.query(func.count(Finding.id)).filter(
+        Finding.investigation_id == investigation_id,
+        Finding.status == "RESOLVED"
+    ).scalar() or 0
+    affected_sessions_count = db.query(func.count(distinct(Finding.session_id))).filter(
+        Finding.investigation_id == investigation_id,
+        Finding.severity != "INFO",
+        Finding.status == "ACTIVE"
+    ).scalar() or 0
+    highest_risk_score = db.query(func.max(Finding.risk_score)).filter(
+        Finding.investigation_id == investigation_id,
+        Finding.status == "ACTIVE"
+    ).scalar() or 0
+
+    # 5. Severity Breakdown for ACTIVE Findings
+    sev_rows = (
+        db.query(Finding.severity, func.count(Finding.id))
+        .filter(Finding.investigation_id == investigation_id, Finding.status == "ACTIVE")
+        .group_by(Finding.severity)
+        .all()
+    )
+    sev_map = {sev: count for sev, count in sev_rows}
+
+    # 6. Security Posture Rule Counts (Distinct Session Count for ACTIVE Findings)
+    rule_rows = (
+        db.query(Finding.rule_id, func.count(distinct(Finding.session_id)))
+        .filter(Finding.investigation_id == investigation_id, Finding.status == "ACTIVE")
+        .group_by(Finding.rule_id)
+        .all()
+    )
+    rule_map = {r: count for r, count in rule_rows}
+
+    # 7. Finding Confidence Breakdown for ACTIVE Findings
+    conf_rows = (
+        db.query(Finding.confidence, func.count(Finding.id))
+        .filter(Finding.investigation_id == investigation_id, Finding.status == "ACTIVE")
+        .group_by(Finding.confidence)
+        .all()
+    )
+    conf_map = {conf: count for conf, count in conf_rows}
+
+    return InvestigationSummaryResponse(
+        investigation_id=inv.id,
+        title=inv.title,
+        status=inv.status,
+        created_at=inv.created_at,
+        totals=InvestigationSummaryTotals(
+            captures_count=captures_count,
+            sessions_count=sessions_count,
+            total_findings_count=total_findings_count,
+            actionable_findings_count=actionable_findings_count,
+            informational_findings_count=informational_findings_count,
+            suppressed_findings_count=suppressed_findings_count,
+            resolved_findings_count=resolved_findings_count,
+            affected_sessions_count=affected_sessions_count,
+            highest_risk_score=highest_risk_score,
+        ),
+        severity_breakdown=SeverityBreakdown(
+            critical=sev_map.get("CRITICAL", 0),
+            high=sev_map.get("HIGH", 0),
+            medium=sev_map.get("MEDIUM", 0),
+            low=sev_map.get("LOW", 0),
+            info=sev_map.get("INFO", 0),
+        ),
+        protocol_breakdown=ProtocolBreakdown(
+            smtp_sessions=proto_map.get("SMTP", 0),
+            imap_sessions=proto_map.get("IMAP", 0),
+            pop3_sessions=proto_map.get("POP3", 0),
+            unknown_sessions=proto_map.get("UNKNOWN", 0),
+        ),
+        security_posture=SecurityPostureSummary(
+            plaintext_not_offered_sessions=rule_map.get("EMAIL-PLAINTEXT-NOT-OFFERED-001", 0),
+            starttls_offered_not_used_sessions=rule_map.get("EMAIL-STARTTLS-OFFERED-NOT-USED-001", 0),
+            weak_static_rsa_sessions=rule_map.get("TLS-WEAK-STATIC-RSA-001", 0),
+            certificate_alert_sessions=rule_map.get("TLS-ALERT-CERT-OBSERVED-001", 0),
+            handshake_failed_sessions=rule_map.get("TLS-HANDSHAKE-FAILED-001", 0),
+            secure_baseline_sessions=rule_map.get("TLS-SECURE-BASELINE-001", 0),
+        ),
+        evidence_quality=EvidenceQualitySummary(
+            complete_sessions=comp_map.get("COMPLETE", 0),
+            incomplete_sessions=comp_map.get("INCOMPLETE", 0),
+            high_confidence_findings=conf_map.get("HIGH", 0),
+            medium_confidence_findings=conf_map.get("MEDIUM", 0),
+            low_or_unknown_confidence_findings=conf_map.get("LOW", 0) + conf_map.get("UNKNOWN", 0),
+        ),
+    )
 
 
 @router.get("/investigations/{investigation_id}/security-events", response_model=List[SecurityEventResponse])
@@ -90,6 +233,7 @@ def get_investigation_findings(
     confidence: Optional[str] = Query(None, description="Filter by confidence (HIGH, MEDIUM, LOW, UNKNOWN)"),
     protocol: Optional[str] = Query(None, description="Filter by protocol (SMTP, IMAP, POP3, UNKNOWN)"),
     rule_id: Optional[str] = Query(None, description="Filter by rule ID"),
+    status: Optional[str] = Query(None, description="Filter by status (ACTIVE, RESOLVED, SUPPRESSED)"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: DbSession = Depends(get_db)
@@ -122,6 +266,8 @@ def get_investigation_findings(
         query = query.filter(Finding.protocol == protocol.upper())
     if rule_id:
         query = query.filter(Finding.rule_id == rule_id)
+    if status:
+        query = query.filter(Finding.status == status.upper())
 
-    findings = query.order_by(Finding.risk_score.desc()).offset(offset).limit(limit).all()
+    findings = query.order_by(Finding.risk_score.desc(), Finding.id.asc()).offset(offset).limit(limit).all()
     return [FindingResponse.from_db(f) for f in findings]

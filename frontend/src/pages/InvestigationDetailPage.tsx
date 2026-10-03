@@ -1,24 +1,42 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { getInvestigation } from "../api/investigations";
+import { getInvestigation, getInvestigationSummary } from "../api/investigations";
 import { listInvestigationSessions } from "../api/sessions";
-import { InvestigationResponse, SessionResponse, CaptureResponse } from "../types/api";
+import { getInvestigationFindings } from "../api/findings";
+import {
+  InvestigationResponse,
+  SessionResponse,
+  CaptureResponse,
+  InvestigationSummaryResponse,
+  FindingResponse,
+} from "../types/api";
 import { formatTimestamp } from "../utils/formatting";
 import { useJobPoller } from "../hooks/useJobPoller";
 import { LoadingState } from "../components/common/LoadingState";
 import { ErrorState } from "../components/common/ErrorState";
 import { CaptureUploadDropzone } from "../components/investigations/CaptureUploadDropzone";
 import { SessionTable } from "../components/sessions/SessionTable";
+import { OverviewMetricCards } from "../components/overview/OverviewMetricCards";
+import { SecurityPostureGrid } from "../components/overview/SecurityPostureGrid";
+import { SeverityDistributionBar } from "../components/overview/SeverityDistributionBar";
+import { EvidenceQualityPanel } from "../components/overview/EvidenceQualityPanel";
+import { TopFindingsCard } from "../components/overview/TopFindingsCard";
 
 export const InvestigationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [investigation, setInvestigation] = useState<InvestigationResponse | null>(null);
   const [sessions, setSessions] = useState<SessionResponse[]>([]);
+  const [summary, setSummary] = useState<InvestigationSummaryResponse | null>(null);
+  const [topFindings, setTopFindings] = useState<FindingResponse[]>([]);
+
   const [loadingInv, setLoadingInv] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(true);
+  const [loadingSummary, setLoadingSummary] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   const fetchInvestigationData = useCallback(async () => {
@@ -40,6 +58,29 @@ export const InvestigationDetailPage: React.FC = () => {
     }
   }, [id]);
 
+  const fetchSummaryData = useCallback(async () => {
+    if (!id) return;
+    setLoadingSummary(true);
+    setSummaryError(null);
+
+    try {
+      const [sumData, findingsData] = await Promise.all([
+        getInvestigationSummary(id),
+        getInvestigationFindings(id, { status: "ACTIVE", limit: 5 }),
+      ]);
+      setSummary(sumData);
+      setTopFindings(findingsData);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setSummaryError(err.message);
+      } else {
+        setSummaryError("Failed to fetch investigation summary metrics.");
+      }
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [id]);
+
   const fetchSessions = useCallback(async () => {
     if (!id) return;
     setLoadingSessions(true);
@@ -47,7 +88,7 @@ export const InvestigationDetailPage: React.FC = () => {
     try {
       const sessionData = await listInvestigationSessions(id);
       setSessions(sessionData);
-    } catch (err: unknown) {
+    } catch {
       // Keep existing sessions if refresh fails
     } finally {
       setLoadingSessions(false);
@@ -56,12 +97,14 @@ export const InvestigationDetailPage: React.FC = () => {
 
   useEffect(() => {
     fetchInvestigationData();
+    fetchSummaryData();
     fetchSessions();
-  }, [fetchInvestigationData, fetchSessions]);
+  }, [fetchInvestigationData, fetchSummaryData, fetchSessions]);
 
   // Hook up Job Poller for background TShark stream analysis
   const { job, polling, error: jobError } = useJobPoller(activeJobId, {
     onCompleted: () => {
+      fetchSummaryData();
       fetchSessions();
     },
   });
@@ -70,6 +113,7 @@ export const InvestigationDetailPage: React.FC = () => {
     if (capture.job_id) {
       setActiveJobId(capture.job_id);
     }
+    fetchSummaryData();
     fetchSessions();
   };
 
@@ -108,7 +152,7 @@ export const InvestigationDetailPage: React.FC = () => {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-5 gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-xs font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/60">
                 {investigation.id}
               </span>
@@ -179,6 +223,39 @@ export const InvestigationDetailPage: React.FC = () => {
         onUploadSuccess={handleUploadSuccess}
         disabled={polling}
       />
+
+      {/* Summary Error Alert */}
+      {summaryError && (
+        <div className="p-4 bg-red-950/50 border border-red-800/80 text-red-300 rounded-lg font-mono text-xs flex items-center justify-between">
+          <span>Failed to load investigation summary: {summaryError}</span>
+          <button
+            onClick={fetchSummaryData}
+            className="px-2.5 py-1 bg-red-900 hover:bg-red-800 text-red-100 rounded text-xs transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* SOC Overview Section */}
+      {loadingSummary ? (
+        <LoadingState message="Calculating authoritative investigation security posture metrics..." />
+      ) : summary ? (
+        <div className="space-y-6">
+          <OverviewMetricCards
+            totals={summary.totals}
+            protocolBreakdown={summary.protocol_breakdown}
+          />
+
+          <SeverityDistributionBar breakdown={summary.severity_breakdown} />
+
+          <SecurityPostureGrid posture={summary.security_posture} />
+
+          <EvidenceQualityPanel evidenceQuality={summary.evidence_quality} />
+
+          <TopFindingsCard findings={topFindings} />
+        </div>
+      ) : null}
 
       {/* Sessions Overview Section */}
       <SessionTable sessions={sessions} loading={loadingSessions} />
