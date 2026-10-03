@@ -60,11 +60,12 @@ flowchart TD
 - `events(id, session_id, packet_number, event_type, timestamp, observed_json)`
 - `tls_handshakes(id, session_id, version, cipher, outcome, completeness, evidence_json)`
 - `certificates(id, handshake_id, fingerprint, subject, issuer, not_before, not_after, public_key, signature_algorithm, validation_json)`
+- `security_events(id, session_id, event_type, protocol, upgrade_status, observed_value, frame_numbers, timestamp, evidence_source, completeness_status, details_json)`
 - `findings(id, session_id, rule_id, severity, confidence, title, explanation, evidence_json, remediation, rule_version)`
 - `ml_assessments(id, session_id, model_version, anomaly_score, feature_json, explanation_json)`
 - `reports(id, investigation_id, format, created_at, path, assessment_version)`
 
-Use SQLAlchemy and Alembic from the beginning. Never persist uploaded secrets in logs. `evidence_json` includes capture hash, stream and packet numbers.
+Use SQLAlchemy and Alembic from the beginning. Never persist uploaded secrets or plaintext passwords in logs or security event metadata. `details_json` includes capture hash, stream and frame references.
 
 ## 5. API v1
 - `GET /api/v1/health` — runtime health and TShark availability (no sensitive paths publicly exposed).
@@ -74,6 +75,8 @@ Use SQLAlchemy and Alembic from the beginning. Never persist uploaded secrets in
 - `GET /api/v1/jobs/{id}` — queued/running/completed/failed and stage; no fabricated percent.
 - `GET /api/v1/investigations/{id}/sessions` — paginated, filterable session list.
 - `GET /api/v1/sessions/{id}` — event timeline and evidence.
+- `GET /api/v1/sessions/{session_id}/security-events` — filterable security events for a specific session (`protocol`, `event_type`, `upgrade_status`, `limit`, `offset`).
+- `GET /api/v1/investigations/{investigation_id}/security-events` — filterable security events across all sessions in an investigation (`protocol`, `event_type`, `upgrade_status`, `limit`, `offset`).
 - `GET /api/v1/investigations/{id}/findings` — filterable findings.
 - `GET /api/v1/investigations/{id}/summary` — aggregate counts, score and coverage.
 - `POST /api/v1/investigations/{id}/reports` — export requested format.
@@ -83,8 +86,18 @@ Response envelopes: IDs, status, timestamps, data, warnings, analysis limitation
 ## 6. Capture security and threat model
 Untrusted uploads can exploit parsers or exhaust resources. Enforce extension + magic bytes + maximum size; process with dedicated low-privilege worker, isolated temp directory, timeout, resource quotas and pinned TShark security updates. Limit path traversal, command injection, decompression bombs (if archives ever allowed), SSRF and arbitrary file reads. Never execute uploaded content. Default loopback-only server; authenticated access before multiuser deployment. Retention/deletion policies must cover raw captures, exports, key logs and backups.
 
-## 7. Cryptographic limitations
-Passive TLS 1.3 captures normally cannot reveal encrypted certificates; optional authorized TLS key logs must be explicitly provided and protected. Capture may omit intermediates, OCSP, DNS context or original client trust store. TLS version/cipher can be unknown on partial handshakes. Static RSA key exchange in TLS 1.2 does not provide forward secrecy; TLS 1.3 key exchange properties require correct negotiated context. Failed STARTTLS is not automatically a successful downgrade attack. Report observed fact separately from potential impact.
+## 7. Cryptographic limitations and evidence confidence semantics
+Passive TLS 1.3 captures encrypt handshake messages following ServerHello (EncryptedExtensions, Certificate, Finished); optional authorized TLS key logs must be explicitly provided and protected to inspect certificate fields. Capture may omit intermediates, OCSP, DNS context or original client trust store.
+
+Key exchange classification rules:
+- TLS 1.3 key exchange is NOT inferred solely from cipher suites (e.g. `TLS_AES_256_GCM_SHA384`). The engine inspects observable key-share parameters in ClientHello/ServerHello (e.g. `X25519`). If key-share evidence is unobserved, `key_exchange` is marked `UNKNOWN`.
+- TLS 1.2 `TLS_RSA_WITH_*` static RSA ciphers are classified as `STATIC_RSA` (`NO_PFS_STATIC_RSA`), whereas `TLS_ECDHE_*` ciphers are classified as `ECDHE` (`PFS ENABLED`).
+
+Evidence confidence levels for handshake completion:
+- `OBSERVED_COMPLETION`: ClientHello, ServerHello, and unencrypted Finished message (handshake type 20) explicitly observed in stream.
+- `STRONGLY_SUPPORTED_COMPLETION`: ClientHello, ServerHello, and post-ServerHello encrypted record exchange observed with zero fatal alerts or resets.
+- `FAILED`: Fatal TLS alert (level 2) or premature TCP Reset (`[RST]`) interrupts handshake negotiation; fatal alerts/resets unconditionally override generic negotiation classification.
+- `UNKNOWN_OUTCOME`: Stream truncated immediately after ServerHello before post-handshake record exchange can be confirmed.
 
 ## 8. Synthetic lab design
 `synthetic-lab/docker-compose.yml` starts isolated email servers and traffic generator; `scenarios/*.yaml` declares protocol, server TLS policy, certificate profile, expected server behavior, capture filter, number of sessions and seed. Capture on the isolated bridge using tcpdump. Write `datasets/manifests/<scenario>.json` with image digests, OpenSSL/TShark versions, cert metadata, capture hash, actual negotiated outcome and expected rule findings. Negative tests include TLS1.3 encrypted certificate, failed handshake, no STARTTLS advertisement, malformed and truncated captures. Never expose intentionally weak services to the public network.

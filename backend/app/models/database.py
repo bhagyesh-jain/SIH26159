@@ -74,6 +74,7 @@ class Session(Base):
 
     capture = relationship("Capture", back_populates="sessions")
     events = relationship("Event", back_populates="session", cascade="all, delete-orphan")
+    security_events = relationship("SecurityEvent", back_populates="session", cascade="all, delete-orphan")
 
 
 class Event(Base):
@@ -89,8 +90,34 @@ class Event(Base):
     session = relationship("Session", back_populates="events")
 
 
+class SecurityEvent(Base):
+    __tablename__ = "security_events"
+
+    id = Column(String, primary_key=True, index=True)
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    event_type = Column(String, nullable=False)  # e.g., GREETING, CAPABILITY_ADVERTISED, UPGRADE_REQUESTED, TLS_HANDSHAKE
+    protocol = Column(String, nullable=False)    # SMTP, IMAP, POP3, UNKNOWN
+    upgrade_status = Column(String, nullable=True) # NOT_OFFERED, OFFERED_NOT_USED, REQUESTED, ACCEPTED, NEGOTIATED, REJECTED, FAILED, UNKNOWN
+    observed_value = Column(Text, nullable=False)
+    frame_numbers = Column(String, nullable=True) # e.g. "4,6,8"
+    timestamp = Column(String, nullable=True)
+    evidence_source = Column(String, nullable=False, default="TSHARK_REASSEMBLED_STREAM")
+    completeness_status = Column(String, nullable=False, default="COMPLETE") # COMPLETE, TRUNCATED, INCOMPLETE
+    details_json = Column(Text, nullable=True)   # JSON string with evidence fields
+
+    session = relationship("Session", back_populates="security_events")
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+
+
+def ensure_schema_migrated(db_engine=engine):
+    """
+    Safely ensures all tables (including security_events) exist without modifying
+    or overwriting existing tables or records.
+    """
+    Base.metadata.create_all(bind=db_engine)
 
 
 def get_db():

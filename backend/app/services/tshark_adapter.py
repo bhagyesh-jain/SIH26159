@@ -36,8 +36,18 @@ def extract_packets_json(pcap_path: Path) -> List[Dict[str, Any]]:
         "-e", "tcp.srcport",
         "-e", "tcp.dstport",
         "-e", "tcp.stream",
+        "-e", "tcp.seq",
+        "-e", "tcp.ack",
+        "-e", "tcp.payload",
         "-e", "_ws.col.Protocol",
-        "-e", "_ws.col.Info"
+        "-e", "_ws.col.Info",
+        "-e", "tls.record.version",
+        "-e", "tls.handshake.type",
+        "-e", "tls.handshake.version",
+        "-e", "tls.handshake.extensions.supported_version",
+        "-e", "tls.handshake.ciphersuite",
+        "-e", "tls.alert_message.level",
+        "-e", "tls.alert_message.desc"
     ]
 
     try:

@@ -1,9 +1,10 @@
 import json
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DbSession
-from backend.app.models.database import get_db, Session as DbSessionModel, Event, Capture
+from backend.app.models.database import get_db, Session as DbSessionModel, Event, Capture, SecurityEvent
 from backend.app.schemas.session import SessionResponse, SessionDetailResponse, EventResponse
+from backend.app.schemas.security_event import SecurityEventResponse
 
 router = APIRouter()
 
@@ -58,3 +59,32 @@ def get_session_detail(session_id: str, db: DbSession = Depends(get_db)):
     res.events = formatted_events
     res.events_count = len(formatted_events)
     return res
+
+
+@router.get("/sessions/{session_id}/security-events", response_model=List[SecurityEventResponse])
+def get_session_security_events(
+    session_id: str,
+    protocol: Optional[str] = Query(None, description="Filter by protocol (SMTP, IMAP, POP3, UNKNOWN)"),
+    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    upgrade_status: Optional[str] = Query(None, description="Filter by upgrade status"),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    db: DbSession = Depends(get_db)
+):
+    """
+    Retrieves persisted security events for a specific session with optional filtering and pagination.
+    """
+    session = db.query(DbSessionModel).filter(DbSessionModel.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session stream not found.")
+
+    query = db.query(SecurityEvent).filter(SecurityEvent.session_id == session_id)
+    if protocol:
+        query = query.filter(SecurityEvent.protocol == protocol.upper())
+    if event_type:
+        query = query.filter(SecurityEvent.event_type == event_type.upper())
+    if upgrade_status:
+        query = query.filter(SecurityEvent.upgrade_status == upgrade_status.upper())
+
+    events = query.offset(offset).limit(limit).all()
+    return [SecurityEventResponse.from_db(evt) for evt in events]

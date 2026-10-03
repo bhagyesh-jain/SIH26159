@@ -55,5 +55,5 @@ scache    unix  -       -       n       -       1       scache
   -o smtpd_tls_key_file=/certs/server_valid.key
   -o smtpd_tls_protocols=!TLSv1.3
   -o smtpd_tls_mandatory_protocols=!TLSv1.3
-  -o smtpd_tls_ciphers=export,low,medium,high
-  -o smtpd_tls_mandatory_ciphers=export,low,medium,high
+  -o smtpd_tls_ciphers=medium
+  -o smtpd_tls_mandatory_ciphers=medium
