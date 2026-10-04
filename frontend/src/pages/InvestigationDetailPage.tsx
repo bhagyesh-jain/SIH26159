@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
 import { getInvestigation, getInvestigationSummary } from "../api/investigations";
 import { listInvestigationSessions } from "../api/sessions";
 import { getInvestigationFindings } from "../api/findings";
@@ -165,9 +165,18 @@ export const InvestigationDetailPage: React.FC = () => {
             </h1>
           </div>
 
-          <div className="text-xs font-mono text-slate-400 flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded border border-slate-800 self-start sm:self-auto">
-            <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span>Opened: {formatTimestamp(investigation.created_at)}</span>
+          <div className="flex items-center gap-3 self-start sm:self-auto">
+            <Link
+              to={`/investigations/${investigation.id}/report`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-mono text-xs font-bold rounded shadow transition-colors"
+            >
+              <FileText className="w-4 h-4" /> Generate Report
+            </Link>
+
+            <div className="text-xs font-mono text-slate-400 flex items-center gap-2 bg-slate-900 px-3 py-2 rounded border border-slate-800">
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <span>Opened: {formatTimestamp(investigation.created_at)}</span>
+            </div>
           </div>
         </div>
       </div>

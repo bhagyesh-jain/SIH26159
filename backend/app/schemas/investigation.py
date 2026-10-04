@@ -1,5 +1,8 @@
+from typing import List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
+from backend.app.schemas.finding import FindingResponse
+from backend.app.schemas.security_event import SecurityEventResponse
 
 
 class InvestigationCreate(BaseModel):
@@ -71,3 +74,18 @@ class InvestigationSummaryResponse(BaseModel):
     evidence_quality: EvidenceQualitySummary
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class InvestigationReportResponse(BaseModel):
+    investigation_id: str
+    title: str
+    status: str
+    created_at: datetime
+    generated_at: datetime
+    evidence_scope: str
+    summary: InvestigationSummaryResponse
+    findings: List[FindingResponse]
+    security_events: List[SecurityEventResponse]
+
+    model_config = ConfigDict(from_attributes=True)
+

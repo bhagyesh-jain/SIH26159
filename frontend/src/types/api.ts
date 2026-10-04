@@ -178,3 +178,16 @@ export interface InvestigationSummaryResponse {
   security_posture: SecurityPostureSummary;
   evidence_quality: EvidenceQualitySummary;
 }
+
+export interface InvestigationReportResponse {
+  investigation_id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  generated_at: string;
+  evidence_scope: "COMPLETE" | "INCOMPLETE" | string;
+  summary: InvestigationSummaryResponse;
+  findings: FindingResponse[];
+  security_events: SecurityEventResponse[];
+}
+

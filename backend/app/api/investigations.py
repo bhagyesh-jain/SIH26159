@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, case
 from sqlalchemy.orm import Session as DbSession
 from backend.app.models.database import (
     get_db, Investigation, Capture, Session as DbSessionModel, SecurityEvent, Finding
@@ -9,7 +10,7 @@ from backend.app.models.database import (
 from backend.app.schemas.investigation import (
     InvestigationCreate, InvestigationResponse, InvestigationSummaryResponse,
     InvestigationSummaryTotals, SeverityBreakdown, ProtocolBreakdown,
-    SecurityPostureSummary, EvidenceQualitySummary
+    SecurityPostureSummary, EvidenceQualitySummary, InvestigationReportResponse
 )
 from backend.app.schemas.security_event import SecurityEventResponse
 from backend.app.schemas.finding import FindingResponse
@@ -185,6 +186,86 @@ def get_investigation_summary(investigation_id: str, db: DbSession = Depends(get
     )
 
 
+@router.get("/investigations/{investigation_id}/report", response_model=InvestigationReportResponse)
+def get_investigation_report(investigation_id: str, db: DbSession = Depends(get_db)):
+    """
+    Returns complete, authoritative forensic report dataset without pagination limits.
+    Deterministic ordering: ACTIVE -> SUPPRESSED -> RESOLVED, risk_score DESC, id ASC.
+    """
+    inv = db.query(Investigation).filter(Investigation.id == investigation_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation case not found.")
+
+    summary = get_investigation_summary(investigation_id, db)
+
+    captures = db.query(Capture).filter(Capture.investigation_id == investigation_id).all()
+    capture_ids = [c.id for c in captures]
+
+    if not capture_ids:
+        return InvestigationReportResponse(
+            investigation_id=inv.id,
+            title=inv.title,
+            status=inv.status,
+            created_at=inv.created_at,
+            generated_at=datetime.utcnow(),
+            evidence_scope="COMPLETE",
+            summary=summary,
+            findings=[],
+            security_events=[],
+        )
+
+    sessions = db.query(DbSessionModel).filter(DbSessionModel.capture_id.in_(capture_ids)).all()
+    session_ids = [s.id for s in sessions]
+
+    if not session_ids:
+        return InvestigationReportResponse(
+            investigation_id=inv.id,
+            title=inv.title,
+            status=inv.status,
+            created_at=inv.created_at,
+            generated_at=datetime.utcnow(),
+            evidence_scope="COMPLETE",
+            summary=summary,
+            findings=[],
+            security_events=[],
+        )
+
+    # Status Ordering: ACTIVE (1), SUPPRESSED (2), RESOLVED (3)
+    status_order = case(
+        (Finding.status == "ACTIVE", 1),
+        (Finding.status == "SUPPRESSED", 2),
+        else_=3
+    )
+
+    findings = (
+        db.query(Finding)
+        .filter(Finding.session_id.in_(session_ids))
+        .order_by(status_order, Finding.risk_score.desc(), Finding.id.asc())
+        .all()
+    )
+
+    events = (
+        db.query(SecurityEvent)
+        .filter(SecurityEvent.session_id.in_(session_ids))
+        .order_by(SecurityEvent.timestamp.asc(), SecurityEvent.id.asc())
+        .all()
+    )
+
+    evidence_scope = "INCOMPLETE" if summary.evidence_quality.incomplete_sessions > 0 else "COMPLETE"
+
+    return InvestigationReportResponse(
+        investigation_id=inv.id,
+        title=inv.title,
+        status=inv.status,
+        created_at=inv.created_at,
+        generated_at=datetime.utcnow(),
+        evidence_scope=evidence_scope,
+        summary=summary,
+        findings=[FindingResponse.from_db(f) for f in findings],
+        security_events=[SecurityEventResponse.from_db(evt) for evt in events],
+    )
+
+
 @router.get("/investigations/{investigation_id}/security-events", response_model=List[SecurityEventResponse])
 def get_investigation_security_events(
     investigation_id: str,
@@ -271,3 +352,4 @@ def get_investigation_findings(
 
     findings = query.order_by(Finding.risk_score.desc(), Finding.id.asc()).offset(offset).limit(limit).all()
     return [FindingResponse.from_db(f) for f in findings]
+
