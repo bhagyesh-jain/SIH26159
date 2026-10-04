@@ -245,4 +245,47 @@ export interface InvestigationIntelligenceResponse {
   insights: IntelligenceInsight[];
 }
 
+export interface AnomalyResultItem {
+  id: string;
+  investigation_id: string;
+  session_id: string;
+  tcp_stream: number;
+  protocol: string;
+  src: string;
+  dst: string;
+  src_port: number;
+  dst_port: number;
+  model_version: string;
+  feature_version: string;
+  anomaly_score: number;
+  anomaly_label: "ANOMALY" | "ELEVATED" | "NORMAL" | string;
+  is_anomalous: boolean;
+  confidence_band: "HIGH" | "MEDIUM" | "LOW" | string;
+  evidence_state: "OBSERVED" | "INCOMPLETE" | "UNKNOWN" | string;
+  contributing_features: string[];
+  supporting_finding_ids: string[];
+  supporting_event_ids: string[];
+  supporting_frame_numbers: number[];
+  explanation: string;
+  created_at?: string | null;
+}
 
+export interface AnomalySummary {
+  total_sessions_analyzed: number;
+  anomalous_sessions_count: number;
+  elevated_sessions_count: number;
+  normal_sessions_count: number;
+  highest_anomaly_score: number;
+  model_version: string;
+  feature_version: string;
+}
+
+export interface InvestigationAnomaliesResponse {
+  investigation_id: string;
+  generated_at: string;
+  model_version: string;
+  feature_version: string;
+  training_context: string;
+  summary: AnomalySummary;
+  results: AnomalyResultItem[];
+}

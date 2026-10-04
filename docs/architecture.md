@@ -157,3 +157,60 @@ React Security Intelligence Panel
 - **200 OK**: Returns structured `InvestigationIntelligenceResponse` containing `risk_summary`, `protocol_exposure`, `pattern_summary`, and prioritized `insights`.
 - **404 Not Found**: Returned for non-existent investigation IDs.
 - **200 OK (Empty)**: Returned for investigations without findings with empty insights array and zeroed metrics.
+
+## 12. ML-Assisted Anomaly Detection Layer (G4.2)
+
+### Overview & Data Flow
+The G4.2 ML Anomaly Detection layer provides transparent, statistical anomaly intelligence built directly above extracted structured evidence.
+```text
+Deterministic Evidence (SecurityEvents, Sessions)
+        ↓
+Deterministic Findings (Rule Engine)
+        ↓
+G4.1 Intelligence (Pattern Correlation)
+        ↓
+Feature Extraction (SessionFeatureVector)
+        ↓
+Pure-Python Isolation Forest (isolation-forest-v1)
+        ↓
+Anomaly Result Persistence (anomaly_results table)
+        ↓
+Deterministic Explanation Generator (Non-causal associated features)
+        ↓
+Analyst Workflow (React Security Intelligence Panel)
+```
+
+### Pure-Python Isolation Forest Engine
+- **Model Version**: `isolation-forest-v1`
+- **Feature Version**: `features-v1`
+- **Engine Architecture**: 100% Deterministic Pure-Python Isolation Forest (`n_estimators=100`, `max_samples=256`, `random_state=42`). Avoids native binary C-extensions to eliminate OS Application Control/AppLocker blockages.
+- **Path Length Calculation**: Computes average isolation depth $h(x)$ across isolation trees and normalizes against BST expected path length $c(n) = 2(\ln(n - 1) + 0.5772156649) - \frac{2(n - 1)}{n}$.
+- **Anomaly Score Semantics**: Scaled score $s(x, n) \in [0, 100]$.
+  - `ANOMALY` ($\ge 65$): High statistical isolation risk.
+  - `ELEVATED` ($50 \le s < 65$): Moderate deviation from baseline profile.
+  - `NORMAL` ($< 50$): Conforms to learned normal baseline.
+
+### Feature Extraction Contract (18 Features)
+Features are extracted strictly from persisted structured entities (`Session`, `SecurityEvent`, `Finding`):
+1. `session_duration_sec`: Duration in seconds.
+2. `protocol_code`: Numeric protocol encoding (SMTP=1.0, IMAP=2.0, POP3=3.0, UNKNOWN=0.0).
+3. `src_port` & `dst_port`: Source & destination TCP ports.
+4. `event_count` & `finding_count`: Volume of security events and active findings.
+5. `highest_risk_score`: Maximum risk score among active session findings.
+6. `starttls_advertised`, `starttls_requested`, `starttls_accepted`, `starttls_negotiated`, `starttls_bypassed`: STARTTLS lifecycle indicators.
+7. `tls_12_observed`, `tls_13_observed`, `weak_rsa_observed`: Cryptographic negotiation parameters.
+8. `tls_alert_count`, `cert_alert_count`, `handshake_failed`: Handshake alert & failure frequencies.
+
+**Critical Anti-Leakage Policy**: PCAP filenames, scenario names, manifest IDs, and capture filenames are strictly forbidden from entering feature vectors to prevent synthetic dataset memorization.
+
+### Explainability & Epistemic Boundaries
+- **Non-Causal Association**: Isolation Forest does not imply causal attribution. Associated features are identified via normalized deviation $\frac{|x_j - \mu_j|}{\sigma_j + 1e-4}$ and labeled as "Associated Features".
+- **Deterministic Natural Language Explanations**: Generated using deterministic templates based on observed evidence values.
+- **Evidence Provenance**: Anomaly outputs link back to `supporting_finding_ids`, `supporting_event_ids`, and `supporting_frame_numbers`.
+- **G4.1 Non-Interference**: ML anomaly scores act as advisory signals only. They NEVER create, overwrite, or suppress deterministic Findings, severity levels, or risk scores.
+
+### API Endpoint
+`GET /api/v1/investigations/{investigation_id}/anomalies`
+- **200 OK**: Returns structured `InvestigationAnomaliesResponse` with model metadata, summary breakdown (`total_sessions_analyzed`, `anomalous_sessions_count`, `elevated_sessions_count`, `normal_sessions_count`), and detailed session results.
+- **404 Not Found**: Non-existent investigation ID.
+- **200 OK (Empty)**: Investigation with no analyzed sessions returns empty results list and zeroed summary.

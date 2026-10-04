@@ -76,6 +76,31 @@ class Session(Base):
     events = relationship("Event", back_populates="session", cascade="all, delete-orphan")
     security_events = relationship("SecurityEvent", back_populates="session", cascade="all, delete-orphan")
     findings = relationship("Finding", back_populates="session", cascade="all, delete-orphan")
+    anomaly_results = relationship("AnomalyResult", back_populates="session", cascade="all, delete-orphan")
+
+
+class AnomalyResult(Base):
+    __tablename__ = "anomaly_results"
+
+    id = Column(String, primary_key=True, index=True)
+    investigation_id = Column(String, ForeignKey("investigations.id"), nullable=False, index=True)
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    model_version = Column(String, nullable=False, default="isolation-forest-v1")
+    feature_version = Column(String, nullable=False, default="features-v1")
+    anomaly_score = Column(Integer, nullable=False)
+    anomaly_label = Column(String, nullable=False)  # ANOMALY, ELEVATED, NORMAL
+    is_anomalous = Column(Integer, nullable=False, default=0)
+    confidence_band = Column(String, nullable=False, default="MEDIUM")
+    evidence_state = Column(String, nullable=False, default="OBSERVED")  # OBSERVED, INCOMPLETE, UNKNOWN
+    contributing_features_json = Column(Text, nullable=False)  # JSON array string
+    supporting_finding_ids = Column(Text, nullable=False)  # JSON array string
+    supporting_event_ids = Column(Text, nullable=False)  # JSON array string
+    supporting_frame_numbers = Column(Text, nullable=False)  # JSON array string
+    explanation = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    session = relationship("Session", back_populates="anomaly_results")
+    investigation = relationship("Investigation")
 
 
 class Event(Base):

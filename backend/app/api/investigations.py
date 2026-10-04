@@ -16,7 +16,9 @@ from backend.app.schemas.security_event import SecurityEventResponse
 from backend.app.schemas.finding import FindingResponse
 from backend.app.schemas.capture import CaptureResponse
 from backend.app.schemas.intelligence import InvestigationIntelligenceResponse
+from backend.app.schemas.anomaly import InvestigationAnomaliesResponse
 from backend.app.services.intelligence_service import compute_investigation_intelligence
+from backend.app.services.ml_anomaly_service import compute_investigation_anomalies
 
 router = APIRouter()
 
@@ -383,4 +385,17 @@ def get_investigation_intelligence(investigation_id: str, db: DbSession = Depend
     if not intel:
         raise HTTPException(status_code=404, detail="Investigation case not found.")
     return intel
+
+
+@router.get("/investigations/{investigation_id}/anomalies", response_model=InvestigationAnomaliesResponse)
+def get_investigation_anomalies(investigation_id: str, db: DbSession = Depends(get_db)):
+    """
+    Returns ML-assisted anomaly detection results and explainable feature attributions
+    for an investigation case.
+    """
+    inv = db.query(Investigation).filter(Investigation.id == investigation_id).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation case not found.")
+
+    return compute_investigation_anomalies(db, investigation_id)
 

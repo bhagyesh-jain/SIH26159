@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, FileText, HardDrive, LayoutDashboard, Layers, BrainCircuit } from "lucide-react";
-import { getInvestigation, getInvestigationSummary, getInvestigationIntelligence } from "../api/investigations";
+import { getInvestigation, getInvestigationSummary, getInvestigationIntelligence, getInvestigationAnomalies } from "../api/investigations";
 import { listInvestigationSessions } from "../api/sessions";
 import { listInvestigationCaptures } from "../api/captures";
 import { getInvestigationFindings } from "../api/findings";
@@ -12,6 +12,7 @@ import {
   InvestigationSummaryResponse,
   FindingResponse,
   InvestigationIntelligenceResponse,
+  InvestigationAnomaliesResponse,
 } from "../types/api";
 import { formatTimestamp } from "../utils/formatting";
 import { useJobPoller } from "../hooks/useJobPoller";
@@ -39,6 +40,7 @@ export const InvestigationDetailPage: React.FC = () => {
   const [summary, setSummary] = useState<InvestigationSummaryResponse | null>(null);
   const [topFindings, setTopFindings] = useState<FindingResponse[]>([]);
   const [intelligence, setIntelligence] = useState<InvestigationIntelligenceResponse | null>(null);
+  const [anomalies, setAnomalies] = useState<InvestigationAnomaliesResponse | null>(null);
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
   const [selectedCapture, setSelectedCapture] = useState<CaptureResponse | null>(null);
@@ -115,8 +117,12 @@ export const InvestigationDetailPage: React.FC = () => {
     setIntelligenceError(null);
 
     try {
-      const intelData = await getInvestigationIntelligence(id);
+      const [intelData, anomalyData] = await Promise.all([
+        getInvestigationIntelligence(id),
+        getInvestigationAnomalies(id).catch(() => null),
+      ]);
       setIntelligence(intelData);
+      setAnomalies(anomalyData);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setIntelligenceError(err.message);
@@ -369,6 +375,7 @@ export const InvestigationDetailPage: React.FC = () => {
       {activeTab === "intelligence" && (
         <SecurityIntelligencePanel
           intelligence={intelligence}
+          anomalies={anomalies}
           loading={loadingIntelligence}
           error={intelligenceError}
           onRetry={fetchIntelligenceData}
