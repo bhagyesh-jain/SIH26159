@@ -80,7 +80,7 @@ describe("SecurityEventsTable Component Tests", () => {
     });
   });
 
-  it("Opening event detail modal exposes structured details", async () => {
+  it("Opening event detail modal exposes structured details and faithful backend evidence provenance", async () => {
     vi.useRealTimers();
     render(<SecurityEventsTable events={mockEvents} />);
 
@@ -89,6 +89,9 @@ describe("SecurityEventsTable Component Tests", () => {
 
     expect(await screen.findByText("Security Event: CAPABILITY_ADVERTISED")).toBeInTheDocument();
     expect(screen.getAllByText("OFFERED_NOT_USED").length).toBeGreaterThan(0);
+    expect(screen.getByText("Source: TSHARK_REASSEMBLED_STREAM")).toBeInTheDocument();
+    expect(screen.getByText("Completeness")).toBeInTheDocument();
+    expect(screen.getAllByText("250-STARTTLS").length).toBeGreaterThan(0);
   });
 
   it("Displays error banner when API error occurs", () => {

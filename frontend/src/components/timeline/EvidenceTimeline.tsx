@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Clock } from "lucide-react";
+import { Clock, AlertCircle } from "lucide-react";
 import { EventResponse } from "../../types/api";
 import { formatTimestamp } from "../../utils/formatting";
 
@@ -36,6 +36,10 @@ export const EvidenceTimeline: React.FC<EvidenceTimelineProps> = ({
     );
   }
 
+  const isHighlightedFramePresent = highlightedFrameNumber
+    ? events.some((e) => e.packet_number === highlightedFrameNumber)
+    : true;
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 font-sans">
       <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
@@ -46,6 +50,15 @@ export const EvidenceTimeline: React.FC<EvidenceTimelineProps> = ({
           Chronological reassembled frame order
         </span>
       </div>
+
+      {highlightedFrameNumber && !isHighlightedFramePresent && (
+        <div className="mb-4 p-3 bg-amber-950/60 border border-amber-800 text-amber-300 rounded font-mono text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span>
+            Evidence frame #{highlightedFrameNumber} is referenced by finding, but frame #{highlightedFrameNumber} is unavailable in this reassembled stream.
+          </span>
+        </div>
+      )}
 
       <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
         {events.map((evt) => {

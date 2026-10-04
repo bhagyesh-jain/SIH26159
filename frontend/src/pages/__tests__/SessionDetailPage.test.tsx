@@ -133,5 +133,110 @@ describe("SessionDetailPage Integration Tests", () => {
 
     expect(await screen.findByText("Session stream not found.")).toBeInTheDocument();
   });
+
+  it("Case A: Valid session + valid finding + valid frame auto-opens finding drawer and highlights frame", async () => {
+    vi.spyOn(sessionsApi, "getSessionDetail").mockResolvedValue(mockSession);
+    vi.spyOn(sessionsApi, "getSessionFindings").mockResolvedValue(mockFindings);
+    vi.spyOn(sessionsApi, "getSessionSecurityEvents").mockResolvedValue(mockSecEvents);
+
+    render(
+      <MemoryRouter initialEntries={["/sessions/sess_smtp_03_s1?finding=fnd_001&frame=8"]}>
+        <Routes>
+          <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("TCP Stream #1")).toBeInTheDocument();
+    expect(await screen.findByText("Forensic Assessment & Description")).toBeInTheDocument();
+  });
+
+  it("Case B: Valid session + valid finding + no frame opens finding drawer without artificial error", async () => {
+    vi.spyOn(sessionsApi, "getSessionDetail").mockResolvedValue(mockSession);
+    vi.spyOn(sessionsApi, "getSessionFindings").mockResolvedValue(mockFindings);
+    vi.spyOn(sessionsApi, "getSessionSecurityEvents").mockResolvedValue(mockSecEvents);
+
+    render(
+      <MemoryRouter initialEntries={["/sessions/sess_smtp_03_s1?finding=fnd_001"]}>
+        <Routes>
+          <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Forensic Assessment & Description")).toBeInTheDocument();
+    expect(screen.queryByText(/unavailable in reassembled stream timeline/i)).not.toBeInTheDocument();
+  });
+
+  it("Case C: Valid session + valid frame + no finding highlights frame without opening finding drawer", async () => {
+    vi.spyOn(sessionsApi, "getSessionDetail").mockResolvedValue(mockSession);
+    vi.spyOn(sessionsApi, "getSessionFindings").mockResolvedValue(mockFindings);
+    vi.spyOn(sessionsApi, "getSessionSecurityEvents").mockResolvedValue(mockSecEvents);
+
+    render(
+      <MemoryRouter initialEntries={["/sessions/sess_smtp_03_s1?frame=8"]}>
+        <Routes>
+          <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("TCP Stream #1")).toBeInTheDocument();
+    expect(screen.queryByText("Forensic Assessment & Description")).not.toBeInTheDocument();
+  });
+
+  it("Case D: Valid session + nonexistent finding ID loads session normally without crash or misleading finding", async () => {
+    vi.spyOn(sessionsApi, "getSessionDetail").mockResolvedValue(mockSession);
+    vi.spyOn(sessionsApi, "getSessionFindings").mockResolvedValue(mockFindings);
+    vi.spyOn(sessionsApi, "getSessionSecurityEvents").mockResolvedValue(mockSecEvents);
+
+    render(
+      <MemoryRouter initialEntries={["/sessions/sess_smtp_03_s1?finding=nonexistent_fnd_999"]}>
+        <Routes>
+          <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("TCP Stream #1")).toBeInTheDocument();
+    expect(screen.queryByText("Forensic Assessment & Description")).not.toBeInTheDocument();
+  });
+
+  it("Case E: Valid session + nonexistent frame displays explicit frame unavailable warning", async () => {
+    vi.spyOn(sessionsApi, "getSessionDetail").mockResolvedValue(mockSession);
+    vi.spyOn(sessionsApi, "getSessionFindings").mockResolvedValue(mockFindings);
+    vi.spyOn(sessionsApi, "getSessionSecurityEvents").mockResolvedValue(mockSecEvents);
+
+    render(
+      <MemoryRouter initialEntries={["/sessions/sess_smtp_03_s1?frame=999"]}>
+        <Routes>
+          <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("TCP Stream #1")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Evidence frame #999 is referenced by finding/i)
+    ).toBeInTheDocument();
+  });
+
+  it("Case F: Finding ID belonging to a different session is not loaded or associated with this session", async () => {
+    vi.spyOn(sessionsApi, "getSessionDetail").mockResolvedValue(mockSession);
+    // Findings returned for current session do NOT contain fnd_other_session_999
+    vi.spyOn(sessionsApi, "getSessionFindings").mockResolvedValue(mockFindings);
+    vi.spyOn(sessionsApi, "getSessionSecurityEvents").mockResolvedValue(mockSecEvents);
+
+    render(
+      <MemoryRouter initialEntries={["/sessions/sess_smtp_03_s1?finding=fnd_other_session_999"]}>
+        <Routes>
+          <Route path="/sessions/:id" element={<SessionDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("TCP Stream #1")).toBeInTheDocument();
+    expect(screen.queryByText("Forensic Assessment & Description")).not.toBeInTheDocument();
+  });
 });
 

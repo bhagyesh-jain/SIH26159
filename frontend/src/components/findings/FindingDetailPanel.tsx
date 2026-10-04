@@ -1,5 +1,6 @@
 import React from "react";
-import { X, ShieldAlert, Info, Eye, HelpCircle, ArrowUpRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import { X, ShieldAlert, Info, Eye, HelpCircle, ArrowUpRight, ExternalLink } from "lucide-react";
 import { FindingResponse } from "../../types/api";
 import { formatTimestamp } from "../../utils/formatting";
 import {
@@ -14,6 +15,7 @@ interface FindingDetailPanelProps {
   onClose: () => void;
   onSelectFrame?: (frameNumber: number) => void;
   onSelectEventId?: (eventId: string) => void;
+  showSessionLink?: boolean;
 }
 
 export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
@@ -21,6 +23,7 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
   onClose,
   onSelectFrame,
   onSelectEventId,
+  showSessionLink = true,
 }) => {
   if (!finding) return null;
 
@@ -50,9 +53,10 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
   }
 
   const EpistemicIcon = epistemicBadge.icon;
+  const firstFrame = finding.evidence_frame_numbers?.[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-xs">
       <div className="bg-slate-900 border-l border-slate-800 w-full max-w-2xl h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between font-sans">
         <div className="space-y-6">
           {/* Panel Header */}
@@ -77,7 +81,7 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
               <h2 className="text-xl font-bold font-mono text-slate-100 mt-2">
                 {finding.title}
               </h2>
-              <div className="text-xs font-mono text-slate-400 mt-1 flex items-center gap-2">
+              <div className="text-xs font-mono text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
                 <span>Rule: <code className="text-cyan-400 font-bold">{finding.rule_id}</code></span>
                 <span>•</span>
                 <span>ID: <code className="text-slate-300">{finding.id}</code></span>
@@ -91,6 +95,22 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Action Bar: Navigate to Session */}
+          {showSessionLink && finding.session_id && (
+            <div className="p-3 bg-slate-950/80 border border-cyan-900/60 rounded-lg flex items-center justify-between font-mono text-xs">
+              <span className="text-slate-400">
+                Target Stream: <code className="text-slate-200 font-bold">{finding.session_id}</code>
+              </span>
+              <Link
+                to={`/sessions/${finding.session_id}${firstFrame ? `?frame=${firstFrame}&finding=${finding.id}` : `?finding=${finding.id}`}`}
+                onClick={onClose}
+                className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 rounded text-xs font-bold transition-colors inline-flex items-center gap-1.5"
+              >
+                Inspect Session Stream <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
 
           {/* Risk Score & Posture Metric Card */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-4 border border-slate-800 rounded-lg text-xs font-mono">
@@ -165,7 +185,7 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
                   ))}
                 </div>
               ) : (
-                <span className="text-slate-500 italic">No frame numbers linked</span>
+                <span className="text-slate-500 italic">No packet frame was retained for this finding</span>
               )}
             </div>
 
@@ -187,7 +207,7 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
                   ))}
                 </div>
               ) : (
-                <span className="text-slate-500 italic">No event IDs linked</span>
+                <span className="text-slate-500 italic">No security event IDs linked</span>
               )}
             </div>
           </div>

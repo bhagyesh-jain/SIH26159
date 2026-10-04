@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { FindingDetailPanel } from "../FindingDetailPanel";
 import { FindingResponse } from "../../../types/api";
 
@@ -29,10 +30,12 @@ describe("FindingDetailPanel Component Tests", () => {
 
   it("4. Finding severity, confidence, and risk score are displayed exactly as supplied by backend", () => {
     render(
-      <FindingDetailPanel
-        finding={mockFinding}
-        onClose={vi.fn()}
-      />
+      <MemoryRouter>
+        <FindingDetailPanel
+          finding={mockFinding}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
     );
 
     expect(screen.getByText("CRITICAL")).toBeInTheDocument();
@@ -43,10 +46,12 @@ describe("FindingDetailPanel Component Tests", () => {
 
   it("5 & 6. Finding evidence frame numbers and event IDs render visibly", () => {
     render(
-      <FindingDetailPanel
-        finding={mockFinding}
-        onClose={vi.fn()}
-      />
+      <MemoryRouter>
+        <FindingDetailPanel
+          finding={mockFinding}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
     );
 
     expect(screen.getByText("Frame #8")).toBeInTheDocument();
@@ -59,11 +64,13 @@ describe("FindingDetailPanel Component Tests", () => {
     const onSelectFrame = vi.fn();
 
     render(
-      <FindingDetailPanel
-        finding={mockFinding}
-        onClose={vi.fn()}
-        onSelectFrame={onSelectFrame}
-      />
+      <MemoryRouter>
+        <FindingDetailPanel
+          finding={mockFinding}
+          onClose={vi.fn()}
+          onSelectFrame={onSelectFrame}
+        />
+      </MemoryRouter>
     );
 
     const frameBtn = screen.getByText("Frame #8");

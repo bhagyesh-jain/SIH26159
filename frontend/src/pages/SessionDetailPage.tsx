@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { ArrowLeft, Activity, ArrowRight } from "lucide-react";
 import { getSessionDetail, getSessionFindings, getSessionSecurityEvents } from "../api/sessions";
 import {
@@ -18,6 +18,7 @@ import { SecurityEventsTable } from "../components/events/SecurityEventsTable";
 
 export const SessionDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
 
   const [session, setSession] = useState<SessionDetailResponse | null>(null);
   const [findings, setFindings] = useState<FindingResponse[]>([]);
@@ -27,6 +28,9 @@ export const SessionDetailPage: React.FC = () => {
 
   const [selectedFinding, setSelectedFinding] = useState<FindingResponse | null>(null);
   const [highlightedFrame, setHighlightedFrame] = useState<number | null>(null);
+
+  const [secEventsLoading, setSecEventsLoading] = useState(false);
+  const [secEventsError, setSecEventsError] = useState<string | null>(null);
 
   const fetchSessionData = useCallback(async () => {
     if (!id) return;
@@ -42,6 +46,26 @@ export const SessionDetailPage: React.FC = () => {
       setSession(sessData);
       setFindings(findingsData);
       setSecurityEvents(secEvtsData);
+
+      // Deep linking support via search params (finding ID / frame number)
+      const findingParam = searchParams.get("finding");
+      const frameParam = searchParams.get("frame");
+
+      if (frameParam && !isNaN(Number(frameParam))) {
+        setHighlightedFrame(Number(frameParam));
+      }
+
+      if (findingParam && findingsData.length > 0) {
+        const targetFinding = findingsData.find(
+          (f) => f.id === findingParam || f.rule_id === findingParam
+        );
+        if (targetFinding) {
+          setSelectedFinding(targetFinding);
+          if (!frameParam && targetFinding.evidence_frame_numbers?.length > 0) {
+            setHighlightedFrame(targetFinding.evidence_frame_numbers[0]);
+          }
+        }
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -51,14 +75,11 @@ export const SessionDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, searchParams]);
 
   useEffect(() => {
     fetchSessionData();
   }, [fetchSessionData]);
-
-  const [secEventsLoading, setSecEventsLoading] = useState(false);
-  const [secEventsError, setSecEventsError] = useState<string | null>(null);
 
   const handleSecurityEventFilterChange = async (filters: SecurityEventQueryParams) => {
     if (!id) return;
@@ -200,6 +221,7 @@ export const SessionDetailPage: React.FC = () => {
         onSelectFrame={(frameNumber) => {
           handleSelectFrame(frameNumber);
         }}
+        showSessionLink={false}
       />
     </div>
   );
