@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { X, ShieldAlert, Info, Eye, HelpCircle, ArrowUpRight, ExternalLink } from "lucide-react";
+import { X, ShieldAlert, Info, Eye, HelpCircle, ArrowUpRight, ExternalLink, HardDrive } from "lucide-react";
 import { FindingResponse } from "../../types/api";
 import { formatTimestamp } from "../../utils/formatting";
 import {
@@ -16,6 +16,8 @@ interface FindingDetailPanelProps {
   onSelectFrame?: (frameNumber: number) => void;
   onSelectEventId?: (eventId: string) => void;
   showSessionLink?: boolean;
+  captureFilename?: string | null;
+  captureSha256?: string | null;
 }
 
 export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
@@ -24,6 +26,8 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
   onSelectFrame,
   onSelectEventId,
   showSessionLink = true,
+  captureFilename,
+  captureSha256,
 }) => {
   if (!finding) return null;
 
@@ -31,6 +35,19 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
   const severityLabel = getSeverityLabel(finding.severity);
   const confidenceLabel = getConfidenceLabel(finding.confidence);
   const riskClass = getRiskScoreClass(finding.risk_score);
+
+  // Derived or explicit capture info
+  const effectiveCaptureFilename =
+    captureFilename ||
+    (finding.details?.capture_filename as string) ||
+    "Originating PCAP Capture";
+  const effectiveCaptureSha256 =
+    captureSha256 || (finding.details?.capture_sha256 as string) || null;
+
+  const truncateHash = (hash: string) => {
+    if (!hash || hash.length <= 16) return hash;
+    return `${hash.slice(0, 8)}...${hash.slice(-8)}`;
+  };
 
   // Determine Epistemic Classifier for the finding
   let epistemicBadge = {
@@ -111,6 +128,26 @@ export const FindingDetailPanel: React.FC<FindingDetailPanelProps> = ({
               </Link>
             </div>
           )}
+
+          {/* Compact Source Capture Provenance Block */}
+          <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-lg font-mono text-xs space-y-1">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <HardDrive className="w-3.5 h-3.5 text-cyan-400" /> Source Capture Provenance
+            </div>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="font-bold text-slate-200">
+                {effectiveCaptureFilename}
+              </span>
+              {effectiveCaptureSha256 && (
+                <code
+                  className="text-cyan-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-[11px]"
+                  title={effectiveCaptureSha256}
+                >
+                  SHA-256: {truncateHash(effectiveCaptureSha256)}
+                </code>
+              )}
+            </div>
+          </div>
 
           {/* Risk Score & Posture Metric Card */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-4 border border-slate-800 rounded-lg text-xs font-mono">

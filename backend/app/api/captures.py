@@ -1,5 +1,6 @@
 import uuid
 import datetime
+from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session as DbSession
 from backend.app.models.database import get_db, Investigation, Capture, AnalysisJob
@@ -62,4 +63,53 @@ def upload_capture(
 
     res = CaptureResponse.model_validate(capture)
     res.job_id = job_id
+    res.status = "QUEUED"
+    res.sessions_count = 0
     return res
+
+
+@router.get("/investigations/{investigation_id}/captures", response_model=List[CaptureResponse])
+def list_investigation_captures(investigation_id: str, db: DbSession = Depends(get_db)):
+    """
+    Returns all PCAP/PCAPNG captures uploaded to an investigation with analysis job status and session counts.
+    """
+    investigation = db.query(Investigation).filter(Investigation.id == investigation_id).first()
+    if not investigation:
+        raise HTTPException(status_code=404, detail="Investigation case not found.")
+
+    captures = db.query(Capture).filter(Capture.investigation_id == investigation_id).order_by(Capture.uploaded_at.desc()).all()
+
+    result = []
+    for cap in captures:
+        c_res = CaptureResponse.model_validate(cap)
+        latest_job = cap.jobs[0] if cap.jobs else None
+        if latest_job:
+            c_res.job_id = latest_job.id
+            c_res.status = latest_job.state
+        else:
+            c_res.status = "COMPLETED"
+        c_res.sessions_count = len(cap.sessions)
+        result.append(c_res)
+
+    return result
+
+
+@router.get("/captures/{capture_id}", response_model=CaptureResponse)
+def get_capture_detail(capture_id: str, db: DbSession = Depends(get_db)):
+    """
+    Returns details and evidence metadata for a specific capture.
+    """
+    capture = db.query(Capture).filter(Capture.id == capture_id).first()
+    if not capture:
+        raise HTTPException(status_code=404, detail="Capture file not found.")
+
+    c_res = CaptureResponse.model_validate(capture)
+    latest_job = capture.jobs[0] if capture.jobs else None
+    if latest_job:
+        c_res.job_id = latest_job.id
+        c_res.status = latest_job.state
+    else:
+        c_res.status = "COMPLETED"
+    c_res.sessions_count = len(capture.sessions)
+    return c_res
+

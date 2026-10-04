@@ -13,5 +13,8 @@ class CaptureResponse(BaseModel):
     uploaded_at: datetime
     tshark_version: Optional[str] = None
     job_id: Optional[str] = None
+    status: Optional[str] = "COMPLETED"
+    sessions_count: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
+

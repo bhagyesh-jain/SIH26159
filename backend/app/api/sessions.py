@@ -16,17 +16,34 @@ def list_investigation_sessions(investigation_id: str, db: DbSession = Depends(g
     Returns all TCP streams/sessions extracted from captures belonging to an investigation.
     """
     captures = db.query(Capture).filter(Capture.investigation_id == investigation_id).all()
-    capture_ids = [c.id for c in captures]
-
-    if not capture_ids:
+    if not captures:
         return []
 
+    capture_map = {c.id: c for c in captures}
+    capture_ids = list(capture_map.keys())
+
     sessions = db.query(DbSessionModel).filter(DbSessionModel.capture_id.in_(capture_ids)).all()
-    
+    if not sessions:
+        return []
+
+    # Batch query event counts per session to prevent N+1
+    from sqlalchemy import func
+    session_ids = [s.id for s in sessions]
+    event_counts = dict(
+        db.query(Event.session_id, func.count(Event.id))
+        .filter(Event.session_id.in_(session_ids))
+        .group_by(Event.session_id)
+        .all()
+    )
+
     result = []
     for s in sessions:
         s_res = SessionResponse.model_validate(s)
-        s_res.events_count = db.query(Event).filter(Event.session_id == s.id).count()
+        s_res.events_count = event_counts.get(s.id, 0)
+        cap = capture_map.get(s.capture_id)
+        if cap:
+            s_res.capture_filename = cap.filename
+            s_res.capture_sha256 = cap.sha256
         result.append(s_res)
 
     return result
@@ -59,6 +76,9 @@ def get_session_detail(session_id: str, db: DbSession = Depends(get_db)):
     res = SessionDetailResponse.model_validate(session)
     res.events = formatted_events
     res.events_count = len(formatted_events)
+    if session.capture:
+        res.capture_filename = session.capture.filename
+        res.capture_sha256 = session.capture.sha256
     return res
 
 

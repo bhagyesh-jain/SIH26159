@@ -166,8 +166,29 @@ export const SessionDetailPage: React.FC = () => {
             </h1>
           </div>
 
-          <div className="text-xs font-mono text-slate-400 bg-slate-900 p-2.5 rounded border border-slate-800 self-start sm:self-auto">
-            Session ID: <code className="text-slate-200 font-bold" title={session.id}>{shortId}</code>
+          <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+            <div className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-2 rounded border border-slate-800 flex items-center gap-2">
+              <span className="text-slate-500">Capture:</span>
+              <span className="text-slate-100 font-bold">{session.capture_filename || session.capture_id}</span>
+              {session.capture_sha256 && (
+                <>
+                  <span className="text-slate-700">|</span>
+                  <span className="text-slate-500">SHA-256:</span>
+                  <code
+                    className="text-cyan-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 text-[11px]"
+                    title={session.capture_sha256}
+                  >
+                    {session.capture_sha256.length > 16
+                      ? `${session.capture_sha256.slice(0, 8)}...${session.capture_sha256.slice(-8)}`
+                      : session.capture_sha256}
+                  </code>
+                </>
+              )}
+            </div>
+
+            <div className="text-xs font-mono text-slate-400 bg-slate-900 px-3 py-2 rounded border border-slate-800">
+              Session ID: <code className="text-slate-200 font-bold" title={session.id}>{shortId}</code>
+            </div>
           </div>
         </div>
       </div>

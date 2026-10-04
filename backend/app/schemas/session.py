@@ -23,8 +23,11 @@ class SessionResponse(BaseModel):
     protocol: str
     completeness: str
     events_count: Optional[int] = 0
+    capture_filename: Optional[str] = None
+    capture_sha256: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class SessionDetailResponse(SessionResponse):
