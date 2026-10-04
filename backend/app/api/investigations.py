@@ -15,6 +15,8 @@ from backend.app.schemas.investigation import (
 from backend.app.schemas.security_event import SecurityEventResponse
 from backend.app.schemas.finding import FindingResponse
 from backend.app.schemas.capture import CaptureResponse
+from backend.app.schemas.intelligence import InvestigationIntelligenceResponse
+from backend.app.services.intelligence_service import compute_investigation_intelligence
 
 router = APIRouter()
 
@@ -369,4 +371,16 @@ def get_investigation_findings(
 
     findings = query.order_by(Finding.risk_score.desc(), Finding.id.asc()).offset(offset).limit(limit).all()
     return [FindingResponse.from_db(f) for f in findings]
+
+
+@router.get("/investigations/{investigation_id}/intelligence", response_model=InvestigationIntelligenceResponse)
+def get_investigation_intelligence(investigation_id: str, db: DbSession = Depends(get_db)):
+    """
+    Returns deterministic, explainable security intelligence and correlation patterns
+    for an investigation case.
+    """
+    intel = compute_investigation_intelligence(investigation_id, db)
+    if not intel:
+        raise HTTPException(status_code=404, detail="Investigation case not found.")
+    return intel
 

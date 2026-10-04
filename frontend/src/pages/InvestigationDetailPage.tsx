@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, FileText, HardDrive, LayoutDashboard, Layers } from "lucide-react";
-import { getInvestigation, getInvestigationSummary } from "../api/investigations";
+import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, FileText, HardDrive, LayoutDashboard, Layers, BrainCircuit } from "lucide-react";
+import { getInvestigation, getInvestigationSummary, getInvestigationIntelligence } from "../api/investigations";
 import { listInvestigationSessions } from "../api/sessions";
 import { listInvestigationCaptures } from "../api/captures";
 import { getInvestigationFindings } from "../api/findings";
@@ -11,6 +11,7 @@ import {
   CaptureResponse,
   InvestigationSummaryResponse,
   FindingResponse,
+  InvestigationIntelligenceResponse,
 } from "../types/api";
 import { formatTimestamp } from "../utils/formatting";
 import { useJobPoller } from "../hooks/useJobPoller";
@@ -20,13 +21,14 @@ import { CaptureUploadDropzone } from "../components/investigations/CaptureUploa
 import { CaptureTable } from "../components/captures/CaptureTable";
 import { CaptureDetailModal } from "../components/captures/CaptureDetailModal";
 import { SessionTable } from "../components/sessions/SessionTable";
+import { SecurityIntelligencePanel } from "../components/intelligence/SecurityIntelligencePanel";
 import { OverviewMetricCards } from "../components/overview/OverviewMetricCards";
 import { SecurityPostureGrid } from "../components/overview/SecurityPostureGrid";
 import { SeverityDistributionBar } from "../components/overview/SeverityDistributionBar";
 import { EvidenceQualityPanel } from "../components/overview/EvidenceQualityPanel";
 import { TopFindingsCard } from "../components/overview/TopFindingsCard";
 
-type WorkspaceTab = "overview" | "captures" | "sessions";
+type WorkspaceTab = "overview" | "intelligence" | "captures" | "sessions";
 
 export const InvestigationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +38,7 @@ export const InvestigationDetailPage: React.FC = () => {
   const [sessions, setSessions] = useState<SessionResponse[]>([]);
   const [summary, setSummary] = useState<InvestigationSummaryResponse | null>(null);
   const [topFindings, setTopFindings] = useState<FindingResponse[]>([]);
+  const [intelligence, setIntelligence] = useState<InvestigationIntelligenceResponse | null>(null);
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
   const [selectedCapture, setSelectedCapture] = useState<CaptureResponse | null>(null);
@@ -44,8 +47,10 @@ export const InvestigationDetailPage: React.FC = () => {
   const [loadingCaptures, setLoadingCaptures] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingSummary, setLoadingSummary] = useState(true);
+  const [loadingIntelligence, setLoadingIntelligence] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [intelligenceError, setIntelligenceError] = useState<string | null>(null);
 
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
@@ -104,6 +109,25 @@ export const InvestigationDetailPage: React.FC = () => {
     }
   }, [id]);
 
+  const fetchIntelligenceData = useCallback(async () => {
+    if (!id) return;
+    setLoadingIntelligence(true);
+    setIntelligenceError(null);
+
+    try {
+      const intelData = await getInvestigationIntelligence(id);
+      setIntelligence(intelData);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setIntelligenceError(err.message);
+      } else {
+        setIntelligenceError("Failed to fetch security intelligence insights.");
+      }
+    } finally {
+      setLoadingIntelligence(false);
+    }
+  }, [id]);
+
   const fetchSessions = useCallback(async () => {
     if (!id) return;
     setLoadingSessions(true);
@@ -122,14 +146,16 @@ export const InvestigationDetailPage: React.FC = () => {
     fetchInvestigationData();
     fetchCaptures();
     fetchSummaryData();
+    fetchIntelligenceData();
     fetchSessions();
-  }, [fetchInvestigationData, fetchCaptures, fetchSummaryData, fetchSessions]);
+  }, [fetchInvestigationData, fetchCaptures, fetchSummaryData, fetchIntelligenceData, fetchSessions]);
 
   // Hook up Job Poller for background TShark stream analysis
   const { job, polling, error: jobError } = useJobPoller(activeJobId, {
     onCompleted: () => {
       fetchCaptures();
       fetchSummaryData();
+      fetchIntelligenceData();
       fetchSessions();
     },
   });
@@ -140,6 +166,7 @@ export const InvestigationDetailPage: React.FC = () => {
     }
     fetchCaptures();
     fetchSummaryData();
+    fetchIntelligenceData();
     fetchSessions();
   };
 
@@ -260,7 +287,7 @@ export const InvestigationDetailPage: React.FC = () => {
       />
 
       {/* Investigation Workspace Navigation Tabs */}
-      <div className="border-b border-slate-800 flex items-center gap-2">
+      <div className="border-b border-slate-800 flex items-center gap-2 flex-wrap">
         <button
           onClick={() => setActiveTab("overview")}
           className={`px-4 py-2.5 text-xs font-mono font-bold transition-colors border-b-2 flex items-center gap-2 ${
@@ -270,6 +297,16 @@ export const InvestigationDetailPage: React.FC = () => {
           }`}
         >
           <LayoutDashboard className="w-4 h-4" /> SOC Overview
+        </button>
+        <button
+          onClick={() => setActiveTab("intelligence")}
+          className={`px-4 py-2.5 text-xs font-mono font-bold transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === "intelligence"
+              ? "border-cyan-400 text-cyan-400 bg-slate-900/60"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <BrainCircuit className="w-4 h-4" /> Security Intelligence ({intelligence?.insights.length ?? 0})
         </button>
         <button
           onClick={() => setActiveTab("captures")}
@@ -327,6 +364,15 @@ export const InvestigationDetailPage: React.FC = () => {
             </div>
           ) : null}
         </>
+      )}
+
+      {activeTab === "intelligence" && (
+        <SecurityIntelligencePanel
+          intelligence={intelligence}
+          loading={loadingIntelligence}
+          error={intelligenceError}
+          onRetry={fetchIntelligenceData}
+        />
       )}
 
       {activeTab === "captures" && (

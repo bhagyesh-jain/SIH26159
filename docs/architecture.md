@@ -118,3 +118,42 @@ datasets/{manifests,samples}
 docs/{PRD.md,architecture.md,design.md}
 ```
 Large PCAPs, secrets, key logs, `.env`, model artifacts and reports are ignored by Git unless intentionally sanitized and approved.
+
+## 11. Finding Intelligence & Correlation Layer (G4.1)
+
+### Overview & Data Flow
+The G4.1 Finding Intelligence layer provides a deterministic, explainable correlation layer built directly above existing persisted `Finding`, `SecurityEvent`, `Session`, `Capture`, and `Investigation` records.
+```text
+Persisted DB Entities (Findings, SecurityEvents, Sessions)
+       ↓
+Intelligence Service (Deterministic Aggregation & Pattern Engine)
+       ↓
+GET /api/v1/investigations/{id}/intelligence
+       ↓
+React Security Intelligence Panel
+```
+
+### Core Epistemic Boundaries
+- **No PCAP Reprocessing**: The intelligence engine NEVER invokes TShark or re-parses packet captures. It operates exclusively on persisted relational metadata.
+- **No Speculative ML / LLM**: Intelligence findings are 100% deterministic and explainable without probabilistic ML or external AI calls.
+- **Evidence Provenance Preservation**: Every generated insight references exact `supporting_finding_ids`, `supporting_session_ids`, `supporting_event_ids`, and `supporting_frame_numbers`.
+- **No False Positive Claims**: Single rule occurrences do NOT generate "repeated" pattern insights. INFO baseline findings (`TLS-SECURE-BASELINE-001`) are excluded from security risk insights.
+
+### Correlation Rules & Deterministic Identifiers
+1. `INTEL-REPEATED-PLAINTEXT-001`: Triggered when `EMAIL-PLAINTEXT-NOT-OFFERED-001` affects $\ge 2$ sessions in the investigation.
+2. `INTEL-REPEATED-STARTTLS-BYPASS-001`: Triggered when `EMAIL-STARTTLS-OFFERED-NOT-USED-001` affects $\ge 2$ sessions.
+3. `INTEL-REPEATED-WEAK-CRYPTO-001`: Triggered when `TLS-WEAK-STATIC-RSA-001` affects $\ge 2$ sessions.
+4. `INTEL-REPEATED-CERT-FAILURE-001`: Triggered when `TLS-ALERT-CERT-OBSERVED-001` affects $\ge 2$ sessions.
+5. `INTEL-REPEATED-TLS-FAILURE-001`: Triggered when `TLS-HANDSHAKE-FAILED-001` affects $\ge 2$ sessions.
+
+### Deterministic Risk, Severity, and Confidence Semantics
+- **Insight Severity**: Defined as `max(severity)` among supporting active findings (`CRITICAL > HIGH > MEDIUM > LOW > INFO`).
+- **Insight Risk Score**: Defined as `max(risk_score)` among supporting active findings.
+- **Insight Confidence**: `HIGH` if supported by multiple sessions ($\ge 2$); `MEDIUM` if supported by a single strong finding; `LOW` if evidence is incomplete.
+- **Evidence State**: Marked `INCOMPLETE` if any supporting finding contains incomplete evidence metadata; otherwise `OBSERVED`.
+
+### API Endpoint
+`GET /api/v1/investigations/{investigation_id}/intelligence`
+- **200 OK**: Returns structured `InvestigationIntelligenceResponse` containing `risk_summary`, `protocol_exposure`, `pattern_summary`, and prioritized `insights`.
+- **404 Not Found**: Returned for non-existent investigation IDs.
+- **200 OK (Empty)**: Returned for investigations without findings with empty insights array and zeroed metrics.

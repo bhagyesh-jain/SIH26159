@@ -4,6 +4,7 @@ import {
   InvestigationResponse,
   InvestigationSummaryResponse,
   InvestigationReportResponse,
+  InvestigationIntelligenceResponse,
 } from "../types/api";
 
 export async function listInvestigations(): Promise<InvestigationResponse[]> {
@@ -32,5 +33,11 @@ export async function getInvestigationReport(
   id: string
 ): Promise<InvestigationReportResponse> {
   return apiGet<InvestigationReportResponse>(`/api/v1/investigations/${id}/report`);
+}
+
+export async function getInvestigationIntelligence(
+  id: string
+): Promise<InvestigationIntelligenceResponse> {
+  return apiGet<InvestigationIntelligenceResponse>(`/api/v1/investigations/${id}/intelligence`);
 }
 

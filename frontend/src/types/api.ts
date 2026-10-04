@@ -196,4 +196,53 @@ export interface InvestigationReportResponse {
   security_events: SecurityEventResponse[];
 }
 
+export interface IntelligenceInsight {
+  id: string;
+  title: string;
+  description: string;
+  severity: FindingSeverity | string;
+  confidence: FindingConfidence | string;
+  risk_score: number;
+  evidence_state: "OBSERVED" | "OBSERVED_BASELINE" | "INCOMPLETE" | "UNKNOWN" | string;
+  supporting_finding_ids: string[];
+  supporting_session_ids: string[];
+  supporting_event_ids: string[];
+  supporting_frame_numbers: number[];
+  remediation?: string | null;
+}
+
+export interface RiskSummaryIntelligence {
+  highest_risk_score: number;
+  highest_risk_finding_id?: string | null;
+  highest_risk_session_id?: string | null;
+  active_findings_count: number;
+  affected_sessions_count: number;
+  risk_concentration: Record<string, number>;
+}
+
+export interface ProtocolExposureItem {
+  protocol: string;
+  total_sessions: number;
+  affected_sessions: number;
+  active_findings_count: number;
+  highest_risk_score: number;
+  severity_breakdown: SeverityBreakdown;
+  dominant_rule_id?: string | null;
+}
+
+export interface PatternSummary {
+  repeated_rules: string[];
+  affected_protocols: string[];
+  affected_sessions_count: number;
+}
+
+export interface InvestigationIntelligenceResponse {
+  investigation_id: string;
+  generated_at: string;
+  risk_summary: RiskSummaryIntelligence;
+  protocol_exposure: ProtocolExposureItem[];
+  pattern_summary: PatternSummary;
+  insights: IntelligenceInsight[];
+}
+
 
