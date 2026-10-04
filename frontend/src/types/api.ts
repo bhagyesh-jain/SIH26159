@@ -19,6 +19,8 @@ export interface CaptureResponse {
   uploaded_at: string;
   tshark_version?: string | null;
   job_id?: string | null;
+  status?: JobState | string | null;
+  sessions_count?: number;
 }
 
 export type JobState = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
@@ -44,6 +46,8 @@ export interface SessionResponse {
   protocol: string;
   completeness: string;
   events_count?: number;
+  capture_filename?: string | null;
+  capture_sha256?: string | null;
 }
 
 export interface EventResponse {
@@ -187,7 +191,9 @@ export interface InvestigationReportResponse {
   generated_at: string;
   evidence_scope: "COMPLETE" | "INCOMPLETE" | string;
   summary: InvestigationSummaryResponse;
+  captures: CaptureResponse[];
   findings: FindingResponse[];
   security_events: SecurityEventResponse[];
 }
+
 

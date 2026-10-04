@@ -10,6 +10,7 @@ import {
   Lock,
   HelpCircle,
   ChevronRight,
+  HardDrive,
 } from "lucide-react";
 import { getInvestigationReport } from "../api/investigations";
 import {
@@ -17,10 +18,11 @@ import {
   InvestigationSummaryResponse,
   FindingResponse,
   SecurityEventResponse,
+  CaptureResponse,
   FindingSeverity,
   FindingConfidence,
 } from "../types/api";
-import { formatTimestamp, formatFrameNumbers } from "../utils/formatting";
+import { formatTimestamp, formatFrameNumbers, formatBytes } from "../utils/formatting";
 import { LoadingState } from "../components/common/LoadingState";
 import { ErrorState } from "../components/common/ErrorState";
 
@@ -29,6 +31,7 @@ export const InvestigationReportPage: React.FC = () => {
 
   const [investigation, setInvestigation] = useState<InvestigationResponse | null>(null);
   const [summary, setSummary] = useState<InvestigationSummaryResponse | null>(null);
+  const [captures, setCaptures] = useState<CaptureResponse[]>([]);
   const [findings, setFindings] = useState<FindingResponse[]>([]);
   const [securityEvents, setSecurityEvents] = useState<SecurityEventResponse[]>([]);
   const [evidenceScope, setEvidenceScope] = useState<string>("COMPLETE");
@@ -52,6 +55,7 @@ export const InvestigationReportPage: React.FC = () => {
         created_at: reportData.created_at,
       });
       setSummary(reportData.summary);
+      setCaptures(reportData.captures || []);
       setFindings(reportData.findings);
       setSecurityEvents(reportData.security_events);
       setEvidenceScope(reportData.evidence_scope);
@@ -346,6 +350,58 @@ export const InvestigationReportPage: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Section 2.5: Source Captures & Evidence Provenance */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-mono font-bold uppercase text-slate-300 print:text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-800 print:border-slate-300 pb-2">
+            <HardDrive className="w-4 h-4 text-cyan-400 print:text-cyan-700" /> Source Captures & Evidence Provenance ({captures.length})
+          </h2>
+
+          {captures.length === 0 ? (
+            <div className="p-4 bg-slate-950 print:bg-slate-50 border border-slate-800 print:border-slate-300 rounded font-mono text-xs text-slate-500">
+              No source capture files recorded for this investigation.
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-800 print:border-slate-300 rounded-lg">
+              <table className="w-full text-left font-mono text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-950 print:bg-slate-100 text-slate-400 print:text-slate-700 border-b border-slate-800 print:border-slate-300">
+                    <th className="py-2.5 px-3 font-semibold">Capture ID</th>
+                    <th className="py-2.5 px-3 font-semibold">Filename</th>
+                    <th className="py-2.5 px-3 font-semibold">Format</th>
+                    <th className="py-2.5 px-3 font-semibold">Size</th>
+                    <th className="py-2.5 px-3 font-semibold">Content SHA-256</th>
+                    <th className="py-2.5 px-3 font-semibold">Uploaded</th>
+                    <th className="py-2.5 px-3 font-semibold">Status</th>
+                    <th className="py-2.5 px-3 font-semibold text-right">Sessions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 print:divide-slate-200 text-slate-300 print:text-black">
+                  {captures.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-800/30 print:hover:bg-transparent">
+                      <td className="py-2 px-3 font-bold text-cyan-400 print:text-cyan-800">{c.id}</td>
+                      <td className="py-2 px-3 font-bold text-slate-100 print:text-black">{c.filename}</td>
+                      <td className="py-2 px-3">{c.format}</td>
+                      <td className="py-2 px-3">{formatBytes(c.bytes)}</td>
+                      <td className="py-2 px-3">
+                        <code className="text-slate-300 print:text-black font-mono text-[11px] bg-slate-950 print:bg-slate-100 px-1.5 py-0.5 rounded border border-slate-800 print:border-slate-300 select-all" title={c.sha256}>
+                          {c.sha256.length > 16 ? `${c.sha256.slice(0, 8)}...${c.sha256.slice(-8)}` : c.sha256}
+                        </code>
+                      </td>
+                      <td className="py-2 px-3 text-[11px] text-slate-400 print:text-slate-600">{formatTimestamp(c.uploaded_at)}</td>
+                      <td className="py-2 px-3">
+                        <span className="font-bold text-emerald-400 print:text-emerald-800">
+                          {c.status || "COMPLETED"}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right font-bold">{c.sessions_count ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Section 3: Security Posture Summary */}

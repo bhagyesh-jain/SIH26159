@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from backend.app.schemas.finding import FindingResponse
 from backend.app.schemas.security_event import SecurityEventResponse
+from backend.app.schemas.capture import CaptureResponse
 
 
 class InvestigationCreate(BaseModel):
@@ -84,8 +85,10 @@ class InvestigationReportResponse(BaseModel):
     generated_at: datetime
     evidence_scope: str
     summary: InvestigationSummaryResponse
+    captures: List[CaptureResponse] = []
     findings: List[FindingResponse]
     security_events: List[SecurityEventResponse]
 
     model_config = ConfigDict(from_attributes=True)
+
 

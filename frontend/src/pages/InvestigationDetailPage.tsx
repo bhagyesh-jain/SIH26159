@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
+import { ArrowLeft, Clock, ShieldCheck, Loader2, AlertTriangle, CheckCircle2, FileText, HardDrive, LayoutDashboard, Layers } from "lucide-react";
 import { getInvestigation, getInvestigationSummary } from "../api/investigations";
 import { listInvestigationSessions } from "../api/sessions";
+import { listInvestigationCaptures } from "../api/captures";
 import { getInvestigationFindings } from "../api/findings";
 import {
   InvestigationResponse,
@@ -16,6 +17,8 @@ import { useJobPoller } from "../hooks/useJobPoller";
 import { LoadingState } from "../components/common/LoadingState";
 import { ErrorState } from "../components/common/ErrorState";
 import { CaptureUploadDropzone } from "../components/investigations/CaptureUploadDropzone";
+import { CaptureTable } from "../components/captures/CaptureTable";
+import { CaptureDetailModal } from "../components/captures/CaptureDetailModal";
 import { SessionTable } from "../components/sessions/SessionTable";
 import { OverviewMetricCards } from "../components/overview/OverviewMetricCards";
 import { SecurityPostureGrid } from "../components/overview/SecurityPostureGrid";
@@ -23,15 +26,22 @@ import { SeverityDistributionBar } from "../components/overview/SeverityDistribu
 import { EvidenceQualityPanel } from "../components/overview/EvidenceQualityPanel";
 import { TopFindingsCard } from "../components/overview/TopFindingsCard";
 
+type WorkspaceTab = "overview" | "captures" | "sessions";
+
 export const InvestigationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [investigation, setInvestigation] = useState<InvestigationResponse | null>(null);
+  const [captures, setCaptures] = useState<CaptureResponse[]>([]);
   const [sessions, setSessions] = useState<SessionResponse[]>([]);
   const [summary, setSummary] = useState<InvestigationSummaryResponse | null>(null);
   const [topFindings, setTopFindings] = useState<FindingResponse[]>([]);
 
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
+  const [selectedCapture, setSelectedCapture] = useState<CaptureResponse | null>(null);
+
   const [loadingInv, setLoadingInv] = useState(true);
+  const [loadingCaptures, setLoadingCaptures] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +65,19 @@ export const InvestigationDetailPage: React.FC = () => {
       }
     } finally {
       setLoadingInv(false);
+    }
+  }, [id]);
+
+  const fetchCaptures = useCallback(async () => {
+    if (!id) return;
+    setLoadingCaptures(true);
+    try {
+      const capData = await listInvestigationCaptures(id);
+      setCaptures(capData);
+    } catch {
+      // Keep existing captures on refresh fail
+    } finally {
+      setLoadingCaptures(false);
     }
   }, [id]);
 
@@ -97,13 +120,15 @@ export const InvestigationDetailPage: React.FC = () => {
 
   useEffect(() => {
     fetchInvestigationData();
+    fetchCaptures();
     fetchSummaryData();
     fetchSessions();
-  }, [fetchInvestigationData, fetchSummaryData, fetchSessions]);
+  }, [fetchInvestigationData, fetchCaptures, fetchSummaryData, fetchSessions]);
 
   // Hook up Job Poller for background TShark stream analysis
   const { job, polling, error: jobError } = useJobPoller(activeJobId, {
     onCompleted: () => {
+      fetchCaptures();
       fetchSummaryData();
       fetchSessions();
     },
@@ -113,6 +138,7 @@ export const InvestigationDetailPage: React.FC = () => {
     if (capture.job_id) {
       setActiveJobId(capture.job_id);
     }
+    fetchCaptures();
     fetchSummaryData();
     fetchSessions();
   };
@@ -140,7 +166,7 @@ export const InvestigationDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Breadcrumb & Navigation */}
       <div>
         <Link
@@ -233,41 +259,101 @@ export const InvestigationDetailPage: React.FC = () => {
         disabled={polling}
       />
 
-      {/* Summary Error Alert */}
-      {summaryError && (
-        <div className="p-4 bg-red-950/50 border border-red-800/80 text-red-300 rounded-lg font-mono text-xs flex items-center justify-between">
-          <span>Failed to load investigation summary: {summaryError}</span>
-          <button
-            onClick={fetchSummaryData}
-            className="px-2.5 py-1 bg-red-900 hover:bg-red-800 text-red-100 rounded text-xs transition-colors"
-          >
-            Retry
-          </button>
+      {/* Investigation Workspace Navigation Tabs */}
+      <div className="border-b border-slate-800 flex items-center gap-2">
+        <button
+          onClick={() => setActiveTab("overview")}
+          className={`px-4 py-2.5 text-xs font-mono font-bold transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === "overview"
+              ? "border-cyan-400 text-cyan-400 bg-slate-900/60"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <LayoutDashboard className="w-4 h-4" /> SOC Overview
+        </button>
+        <button
+          onClick={() => setActiveTab("captures")}
+          className={`px-4 py-2.5 text-xs font-mono font-bold transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === "captures"
+              ? "border-cyan-400 text-cyan-400 bg-slate-900/60"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <HardDrive className="w-4 h-4" /> Source Captures ({captures.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("sessions")}
+          className={`px-4 py-2.5 text-xs font-mono font-bold transition-colors border-b-2 flex items-center gap-2 ${
+            activeTab === "sessions"
+              ? "border-cyan-400 text-cyan-400 bg-slate-900/60"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Layers className="w-4 h-4" /> Sessions ({sessions.length})
+        </button>
+      </div>
+
+      {/* Workspace Tab Contents */}
+      {activeTab === "overview" && (
+        <>
+          {summaryError && (
+            <div className="p-4 bg-red-950/50 border border-red-800/80 text-red-300 rounded-lg font-mono text-xs flex items-center justify-between">
+              <span>Failed to load investigation summary: {summaryError}</span>
+              <button
+                onClick={fetchSummaryData}
+                className="px-2.5 py-1 bg-red-900 hover:bg-red-800 text-red-100 rounded text-xs transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {loadingSummary ? (
+            <LoadingState message="Calculating authoritative investigation security posture metrics..." />
+          ) : summary ? (
+            <div className="space-y-6">
+              <OverviewMetricCards
+                totals={summary.totals}
+                protocolBreakdown={summary.protocol_breakdown}
+              />
+
+              <SeverityDistributionBar breakdown={summary.severity_breakdown} />
+
+              <SecurityPostureGrid posture={summary.security_posture} />
+
+              <EvidenceQualityPanel evidenceQuality={summary.evidence_quality} />
+
+              <TopFindingsCard findings={topFindings} />
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {activeTab === "captures" && (
+        <div className="space-y-6">
+          <CaptureTable
+            captures={captures}
+            loading={loadingCaptures}
+            onSelectCapture={(c) => setSelectedCapture(c)}
+          />
         </div>
       )}
 
-      {/* SOC Overview Section */}
-      {loadingSummary ? (
-        <LoadingState message="Calculating authoritative investigation security posture metrics..." />
-      ) : summary ? (
+      {activeTab === "sessions" && (
         <div className="space-y-6">
-          <OverviewMetricCards
-            totals={summary.totals}
-            protocolBreakdown={summary.protocol_breakdown}
-          />
-
-          <SeverityDistributionBar breakdown={summary.severity_breakdown} />
-
-          <SecurityPostureGrid posture={summary.security_posture} />
-
-          <EvidenceQualityPanel evidenceQuality={summary.evidence_quality} />
-
-          <TopFindingsCard findings={topFindings} />
+          <SessionTable sessions={sessions} loading={loadingSessions} />
         </div>
-      ) : null}
+      )}
 
-      {/* Sessions Overview Section */}
-      <SessionTable sessions={sessions} loading={loadingSessions} />
+      {/* Capture Detail Modal */}
+      <CaptureDetailModal
+        capture={selectedCapture}
+        onClose={() => setSelectedCapture(null)}
+        onNavigateToSessions={() => {
+          setActiveTab("sessions");
+        }}
+      />
     </div>
   );
 };
+

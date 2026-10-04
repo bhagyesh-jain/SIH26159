@@ -14,6 +14,7 @@ from backend.app.schemas.investigation import (
 )
 from backend.app.schemas.security_event import SecurityEventResponse
 from backend.app.schemas.finding import FindingResponse
+from backend.app.schemas.capture import CaptureResponse
 
 router = APIRouter()
 
@@ -191,6 +192,7 @@ def get_investigation_report(investigation_id: str, db: DbSession = Depends(get_
     """
     Returns complete, authoritative forensic report dataset without pagination limits.
     Deterministic ordering: ACTIVE -> SUPPRESSED -> RESOLVED, risk_score DESC, id ASC.
+    Includes full source captures provenance.
     """
     inv = db.query(Investigation).filter(Investigation.id == investigation_id).first()
     if not inv:
@@ -198,8 +200,20 @@ def get_investigation_report(investigation_id: str, db: DbSession = Depends(get_
 
     summary = get_investigation_summary(investigation_id, db)
 
-    captures = db.query(Capture).filter(Capture.investigation_id == investigation_id).all()
+    captures = db.query(Capture).filter(Capture.investigation_id == investigation_id).order_by(Capture.uploaded_at.desc()).all()
     capture_ids = [c.id for c in captures]
+
+    captures_response = []
+    for cap in captures:
+        c_res = CaptureResponse.model_validate(cap)
+        latest_job = cap.jobs[0] if cap.jobs else None
+        if latest_job:
+            c_res.job_id = latest_job.id
+            c_res.status = latest_job.state
+        else:
+            c_res.status = "COMPLETED"
+        c_res.sessions_count = len(cap.sessions)
+        captures_response.append(c_res)
 
     if not capture_ids:
         return InvestigationReportResponse(
@@ -210,6 +224,7 @@ def get_investigation_report(investigation_id: str, db: DbSession = Depends(get_
             generated_at=datetime.utcnow(),
             evidence_scope="COMPLETE",
             summary=summary,
+            captures=captures_response,
             findings=[],
             security_events=[],
         )
@@ -226,6 +241,7 @@ def get_investigation_report(investigation_id: str, db: DbSession = Depends(get_
             generated_at=datetime.utcnow(),
             evidence_scope="COMPLETE",
             summary=summary,
+            captures=captures_response,
             findings=[],
             security_events=[],
         )
@@ -261,6 +277,7 @@ def get_investigation_report(investigation_id: str, db: DbSession = Depends(get_
         generated_at=datetime.utcnow(),
         evidence_scope=evidence_scope,
         summary=summary,
+        captures=captures_response,
         findings=[FindingResponse.from_db(f) for f in findings],
         security_events=[SecurityEventResponse.from_db(evt) for evt in events],
     )

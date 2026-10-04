@@ -119,6 +119,19 @@ describe("InvestigationReportPage Component Tests", () => {
     },
     findings: mockFindings,
     security_events: mockSecurityEvents,
+    captures: [
+      {
+        id: "cap_001",
+        investigation_id: "inv_report_test_01",
+        filename: "SCN-SMTP-01.pcap",
+        sha256: "9e4a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a",
+        bytes: 204800,
+        format: "PCAP",
+        uploaded_at: "2026-10-04T01:00:00Z",
+        status: "COMPLETED",
+        sessions_count: 2,
+      },
+    ],
   };
 
   beforeEach(() => {
